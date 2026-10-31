@@ -37,3 +37,7 @@ Add the site URL to Supabase **Authentication → URL Configuration → Redirect
 ## Going native later
 
 The app is plain HTML/JS, so it can be wrapped with Capacitor for the App Store and Google Play without a rewrite.
+
+## Releasing changes
+
+Bump the `?v=` number in `index.html`, the imports at the top of `app.js`, and `sw.js` (cache name and file list) so browsers fetch the new files right away.
