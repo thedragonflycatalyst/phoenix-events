@@ -107,8 +107,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 [data-cat="other"] { --c: var(--other); }
 
 /* home layout */
-.home { display: grid; gap: 20px; }
-@media (min-width: 900px) { .home { grid-template-columns: 380px 1fr; align-items: start; } .home > aside { position: sticky; top: 12px; } }
+.home { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+.home > * { min-width: 0; }
+@media (min-width: 900px) { .home { grid-template-columns: 380px minmax(0, 1fr); align-items: start; } .home > aside { position: sticky; top: 12px; } }
 .hello { padding: 8px 0 4px; }
 .hello p { color: var(--muted); margin-top: 6px; }
 
