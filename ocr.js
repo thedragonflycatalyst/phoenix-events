@@ -76,7 +76,8 @@ export function parsePoster(data, chrono) {
   // Title: the largest text on the poster that isn't the date
   const used = new Set();
   const dateText = results.map((r) => r.text.toLowerCase());
-  const candidates = lines.filter((l) => !dateText.some((d) => l.text.toLowerCase().includes(d)) && !ADDRESS.test(l.text) && l.text.length <= 80);
+  const isDateLine = (t) => dateText.some((d) => t.toLowerCase().includes(d) || d.includes(t.toLowerCase())) || chrono.parse(t, ref).length > 0;
+  const candidates = lines.filter((l) => !isDateLine(l.text) && !ADDRESS.test(l.text) && l.text.length <= 80);
   candidates.sort((a, b) => b.h - a.h);
   if (candidates[0]) {
     // Join a second line of the same size ("HAUNTED" / "TRAIL")
@@ -92,7 +93,7 @@ export function parsePoster(data, chrono) {
   // Place
   const addr = text.match(ADDRESS);
   if (addr) found.address = tidy(addr[0]);
-  const venue = lines.find((l) => !used.has(l) && VENUE.test(l.text) && !ADDRESS.test(l.text) && !dateText.some((d) => l.text.toLowerCase().includes(d)));
+  const venue = lines.find((l) => !used.has(l) && VENUE.test(l.text) && !ADDRESS.test(l.text) && !isDateLine(l.text));
   if (venue) found.location_name = tidy(venue.text).replace(/^(at|@|location:?|where:?)\s+/i, '').slice(0, 200);
 
   const url = text.match(/\b(?:https?:\/\/|www\.)[^\s]+/i);

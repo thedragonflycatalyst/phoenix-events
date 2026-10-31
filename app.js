@@ -351,7 +351,7 @@ async function viewCalendar() {
     const heading = state.day ? fmtDay(`${state.day}T12:00:00`) : Object.fromEntries(WHENS)[state.filters.when];
     if (!listEvents.length) {
       list.innerHTML = `<h2 style="margin-bottom:12px">${h(heading)}</h2><div class="empty"><h2>Nothing here yet</h2>
-        <p>${activeFilterCount() ? 'Try fewer filters, or ' : ''}share an event you know about. A photo of a flyer works.</p>
+        <p>${activeFilterCount() ? 'Try fewer filters, or share' : 'Share'} an event you know about. A photo of a flyer works.</p>
         <a class="btn" href="#/add">Add an event</a></div>`;
       return;
     }
