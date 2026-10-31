@@ -123,7 +123,7 @@ async function loadMe() {
 function renderAccount() {
   const el = $('#account');
   if (!state.user) { el.innerHTML = '<button class="btn small" id="signin">Sign in</button>'; $('#signin').onclick = () => authDialog(); return; }
-  el.innerHTML = `<button class="btn small quiet" id="me">@${h(state.username)}</button>`;
+  el.innerHTML = `<button class="avatar" id="me" aria-label="Your account, @${h(state.username)}">${h((state.username || "?").replace(/^@/, "").charAt(0).toUpperCase())}</button>`;
   $('#me').onclick = () => openDialog(`<h2>@${h(state.username)}</h2>
     <p class="muted">${state.role ? `You’re a${state.role === 'admin' ? 'n' : ''} ${h(state.role)} for The Phoenix Catalyst. ` : ''}This is your Dragonfly account, the same one you use across Dragonfly apps.</p>
     <div class="row">
@@ -251,55 +251,107 @@ function activeFilterCount() {
 }
 
 /* ---------- views ---------- */
+const EMOJI = { environmental: '🌿', community: '🤝', wellness: '🏃', mental: '🧘', arts: '🎨', other: '✨' };
+const COST = Object.fromEntries(COSTS);
+const SVG = {
+  search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  sliders: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>',
+  share: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+};
+const monShort = (d) => new Date(d).toLocaleDateString(undefined, { month: 'short' });
+const dowShort = (d) => new Date(d).toLocaleDateString(undefined, { weekday: 'short' });
+function relDay(d) {
+  const k = dayKey(d), t = startOfDay(new Date());
+  if (k <= dayKey(t)) return 'Today';
+  if (k === dayKey(addDays(t, 1))) return 'Tomorrow';
+  if (k < dayKey(addDays(t, 7))) return new Date(d).toLocaleDateString(undefined, { weekday: 'long' });
+  return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+const tileWhen = (e) => (e.all_day ? `${relDay(e.starts_at)}, all day` : `${relDay(e.starts_at)} at ${fmtTime(e.starts_at)}`);
+
+// Every event is a poster: the real flyer photo, or a generated poster in its pillar's color
+function cover(e, withAlt = false) {
+  const art = e.poster_path
+    ? `<img src="${h(posterUrl(e.poster_path))}" alt="${withAlt ? `Poster for ${h(e.title)}` : ''}" loading="lazy">${e.is_tpc ? '<span class="tpc">Phoenix Catalyst</span>' : ''}`
+    : `<div class="gen" aria-hidden="true"><span class="glyph">${EMOJI[e.category] || '✨'}</span><span class="ptitle">${h(e.title)}</span></div>`;
+  return `<div class="cover" data-cat="${h(e.category)}">${art}<span class="stamp" aria-hidden="true"><small>${h(monShort(e.starts_at))}</small><b>${new Date(e.starts_at).getDate()}</b></span></div>`;
+}
+function tile(e) {
+  return `<a class="tile" data-cat="${h(e.category)}" href="#/event/${e.id}">${cover(e)}
+    <div class="when">${h(tileWhen(e))}</div><div class="t">${h(e.title)}</div>${e.location_name ? `<div class="where">${h(e.location_name)}</div>` : ''}</a>`;
+}
 function evRow(e) {
   const rs = state.rsvps.get(e.id);
-  return `<a class="ev" data-cat="${h(e.category)}" href="#/event/${e.id}">
-    <span class="bar"></span>
-    <span class="body">
-      <span class="t">${h(e.title)}</span>
-      <span class="meta">${h(whenText(e))}${e.location_name ? ` at ${h(e.location_name)}` : ''}</span>
-      <span class="badges">
-        ${e.is_tpc ? '<span class="badge tpc">Phoenix Catalyst</span>' : ''}
-        ${e.cost !== 'free' ? `<span class="badge">${h(Object.fromEntries(COSTS)[e.cost])}</span>` : '<span class="badge">Free</span>'}
-        ${rs ? `<span class="badge">${rs === 'volunteer' ? 'You’re volunteering' : 'You’re going'}</span>` : ''}
-        ${e.going_count ? `<span class="badge">${e.going_count} going</span>` : ''}
-      </span>
-    </span>
-    ${e.poster_path ? `<img class="thumb" src="${h(posterUrl(e.poster_path))}" alt="" loading="lazy">` : '<span class="nothumb"></span>'}
-  </a>`;
+  return `<a class="ticket" data-cat="${h(e.category)}" href="#/event/${e.id}">
+    <span class="date" aria-hidden="true"><small>${h(dowShort(e.starts_at))}</small><b>${new Date(e.starts_at).getDate()}</b></span>
+    <span class="body"><span class="t">${h(e.title)}</span>
+      <span class="meta">${h(whenText(e))}${e.location_name ? `, ${h(e.location_name)}` : ''}</span>
+      <span class="badges">${e.is_tpc ? '<span class="badge tpc">Phoenix Catalyst</span>' : ''}<span class="badge">${h(COST[e.cost])}</span>
+        ${rs ? `<span class="badge me">${rs === 'volunteer' ? 'Volunteering' : 'Going'}</span>` : ''}${e.going_count ? `<span class="badge">${e.going_count} going</span>` : ''}</span></span>
+    <span class="thumb">${cover(e)}</span></a>`;
+}
+function spotlight(e) {
+  const left = e.volunteer_slots ? Math.max(0, e.volunteer_slots - e.volunteer_count) : null;
+  return `<a class="spot" data-cat="${h(e.category)}" href="#/event/${e.id}">${cover(e)}<div>
+    <div class="kicker">Volunteer with The Phoenix Catalyst</div><div class="t">${h(e.title)}</div>
+    <div class="muted small">${h(tileWhen(e))}${e.location_name ? `, ${h(e.location_name)}` : ''}</div>
+    ${e.volunteer_slots ? `<div class="meter" aria-hidden="true"><i style="width:${Math.min(100, Math.round(100 * e.volunteer_count / e.volunteer_slots))}%"></i></div>
+      <div class="small muted" style="margin-top:4px">${left ? `${left} of ${e.volunteer_slots} spots open` : 'All spots filled'}</div>`
+      : `<div class="small muted" style="margin-top:6px">${e.volunteer_count} volunteer${e.volunteer_count === 1 ? '' : 's'} signed up</div>`}
+  </div></a>`;
 }
 
-function chipRow(items, selected, attr, withColor = false) {
-  return items.map(([k, label]) => `<button type="button" class="chip" data-${attr}="${h(k)}" ${withColor ? `data-cat="${h(k)}"` : ''} aria-pressed="${selected.includes(k)}">${withColor ? '<span class="dot"></span>' : ''}${h(label)}</button>`).join('');
+function chipRow(items, selected, attr) {
+  return items.map(([k, label]) => `<button type="button" class="chip" data-${attr}="${h(k)}" aria-pressed="${selected.includes(k)}">${h(label)}</button>`).join('');
 }
-function filtersHtml(compact = false) {
-  const f = state.filters, n = activeFilterCount();
-  return `<div class="filters ${recall('pe.filtersOpen', false) ? '' : 'collapsed'}" id="filters">
-    <form class="searchbar" id="qform" role="search"><input type="search" name="q" value="${h(f.q)}" placeholder="Search yoga, food drive, trail…" aria-label="Search events"><button class="btn" type="submit">Search</button></form>
-    ${compact ? '' : `<div class="chips" role="group" aria-label="When">${WHENS.map(([k, l]) => `<button type="button" class="chip" data-when="${k}" aria-pressed="${f.when === k && !state.day}">${l}</button>`).join('')}</div>`}
-    <div class="chips" role="group" aria-label="Type of event">${chipRow(CATS.map((c) => [c.key, c.label]), f.cats, 'cat-f', true)}</div>
-    <button type="button" class="btn small quiet filter-toggle" id="ftoggle">${n ? `More filters (${n} on)` : 'More filters'}</button>
-    <div class="more">
-      <h3>Good for</h3><div class="chips wrap">${chipRow(TAGS, f.tags, 'tag')}</div>
-      <h3>Cost</h3><div class="chips wrap">${chipRow(COSTS, f.cost, 'cost')}</div>
-      <h3>Distance</h3><div class="chips wrap">${RADII.map(([k, l]) => `<button type="button" class="chip" data-radius="${k ?? ''}" aria-pressed="${f.radius === k}">${l}</button>`).join('')}</div>
-      <label class="check"><input type="checkbox" id="tpconly" ${f.tpc ? 'checked' : ''}> Only Phoenix Catalyst volunteer events</label>
-      ${n ? '<button type="button" class="btn small ghost" id="fclear">Clear filters</button>' : ''}
-    </div>
+function catChips() {
+  const f = state.filters;
+  return `<div class="chips" role="group" aria-label="Type of event">
+    <button type="button" class="chip" data-quick="all" aria-pressed="${!f.cats.length && !f.tpc}"><span class="e">✨</span>Everything</button>
+    <button type="button" class="chip" data-quick="tpc" data-cat="wellness" aria-pressed="${f.tpc}"><span class="e">🔥</span>Volunteer</button>
+    ${CATS.slice(0, 5).map((c) => `<button type="button" class="chip" data-cat="${c.key}" data-cat-f="${c.key}" aria-pressed="${f.cats.includes(c.key)}"><span class="e">${EMOJI[c.key]}</span>${h(c.label)}</button>`).join('')}
   </div>`;
 }
-function wireFilters(root, rerender) {
+function filterCount() { return activeFilterCount() - state.filters.cats.length - (state.filters.tpc ? 1 : 0) - (state.filters.q ? 1 : 0) + (state.filters.when !== 'upcoming' ? 1 : 0); }
+function searchRow() {
+  const n = filterCount();
+  return `<div class="searchrow"><form class="search" id="qform" role="search">${SVG.search}<input type="search" name="q" value="${h(state.filters.q)}" placeholder="Yoga, food drive, trail…" aria-label="Search events"></form>
+    <button type="button" class="btn quiet iconbtn fbtn" id="fopen" aria-label="Filters${n ? `, ${n} on` : ''}">${SVG.sliders}${n ? `<b>${n}</b>` : ''}</button></div>`;
+}
+function wireQuick(root, rerender) {
   const f = state.filters;
   const toggle = (arr, v) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
   root.querySelector('#qform').addEventListener('submit', (e) => { e.preventDefault(); f.q = e.target.q.value.trim(); saveFilters(); rerender(); });
-  root.querySelector('#ftoggle')?.addEventListener('click', () => { const el = $('#filters'); el.classList.toggle('collapsed'); store('pe.filtersOpen', !el.classList.contains('collapsed')); });
-  root.querySelectorAll('[data-when]').forEach((b) => b.onclick = () => { f.when = b.dataset.when; state.day = null; saveFilters(); rerender(); });
+  root.querySelector('#qform input').addEventListener('search', (e) => { if (!e.target.value && f.q) { f.q = ''; saveFilters(); rerender(); } });
   root.querySelectorAll('[data-cat-f]').forEach((b) => b.onclick = () => { f.cats = toggle(f.cats, b.dataset.catF); saveFilters(); rerender(); });
-  root.querySelectorAll('[data-tag]').forEach((b) => b.onclick = () => { f.tags = toggle(f.tags, b.dataset.tag); saveFilters(); rerender(); });
-  root.querySelectorAll('[data-cost]').forEach((b) => b.onclick = () => { f.cost = toggle(f.cost, b.dataset.cost); saveFilters(); rerender(); });
-  root.querySelectorAll('[data-radius]').forEach((b) => b.onclick = () => { f.radius = b.dataset.radius ? Number(b.dataset.radius) : null; saveFilters(); rerender(); });
-  root.querySelector('#tpconly').onchange = (e) => { f.tpc = e.target.checked; saveFilters(); rerender(); };
-  root.querySelector('#fclear')?.addEventListener('click', () => { Object.assign(f, { cats: [], tags: [], cost: [], tpc: false, q: '', radius: null }); saveFilters(); rerender(); });
+  root.querySelector('[data-quick=all]').onclick = () => { f.cats = []; f.tpc = false; saveFilters(); rerender(); };
+  root.querySelector('[data-quick=tpc]').onclick = () => { f.tpc = !f.tpc; saveFilters(); rerender(); };
+  root.querySelector('#fopen').onclick = () => filterSheet(rerender);
+}
+function filterSheet(rerender) {
+  const draft = JSON.parse(JSON.stringify(state.filters));
+  const toggle = (arr, v) => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
+  const paint = (d) => {
+    d.querySelectorAll('[data-when]').forEach((b) => b.setAttribute('aria-pressed', draft.when === b.dataset.when));
+    d.querySelectorAll('[data-tag]').forEach((b) => b.setAttribute('aria-pressed', draft.tags.includes(b.dataset.tag)));
+    d.querySelectorAll('[data-cost]').forEach((b) => b.setAttribute('aria-pressed', draft.cost.includes(b.dataset.cost)));
+    d.querySelectorAll('[data-radius]').forEach((b) => b.setAttribute('aria-pressed', String(draft.radius ?? '') === b.dataset.radius));
+  };
+  openDialog(`<div class="sheet"><h2>Filters</h2>
+    <h3>When</h3><div class="chips wrap">${WHENS.map(([k, l]) => `<button type="button" class="chip" data-when="${k}">${l}</button>`).join('')}</div>
+    <h3>Good for</h3><div class="chips wrap">${chipRow(TAGS, [], 'tag')}</div>
+    <h3>Cost</h3><div class="chips wrap">${chipRow(COSTS, [], 'cost')}</div>
+    <h3>Distance</h3><div class="chips wrap">${RADII.map(([k, l]) => `<button type="button" class="chip" data-radius="${k ?? ''}">${l}</button>`).join('')}</div>
+    <div class="foot"><button type="button" class="btn ghost" id="freset">Reset</button><button type="button" class="btn" id="fapply">Show events</button></div></div>`, (d) => {
+    paint(d);
+    d.querySelectorAll('[data-when]').forEach((b) => b.onclick = () => { draft.when = b.dataset.when; paint(d); });
+    d.querySelectorAll('[data-tag]').forEach((b) => b.onclick = () => { draft.tags = toggle(draft.tags, b.dataset.tag); paint(d); });
+    d.querySelectorAll('[data-cost]').forEach((b) => b.onclick = () => { draft.cost = toggle(draft.cost, b.dataset.cost); paint(d); });
+    d.querySelectorAll('[data-radius]').forEach((b) => b.onclick = () => { draft.radius = b.dataset.radius ? Number(b.dataset.radius) : null; paint(d); });
+    $('#freset', d).onclick = () => { Object.assign(draft, { when: 'upcoming', tags: [], cost: [], radius: null }); paint(d); };
+    $('#fapply', d).onclick = () => { Object.assign(state.filters, draft); state.day = null; saveFilters(); d.close(); rerender(); };
+  });
 }
 
 function monthHtml(events) {
@@ -330,35 +382,48 @@ function monthHtml(events) {
   </div>`;
 }
 
+function greeting() {
+  const hr = new Date().getHours();
+  const part = hr < 5 ? 'Up late' : hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  return state.username && !state.username.includes('@') ? `${part}, ${state.username}` : part;
+}
+
 async function viewCalendar() {
   const root = main();
-  root.innerHTML = `<div class="hello"><h1>Bring color back into your world</h1><p>Local events near you, shared by neighbors and The Phoenix Catalyst.</p></div>
-    <div class="home"><aside id="side"></aside><section id="list" aria-live="polite"><p class="muted">Loading events…</p></section></div>`;
+  root.innerHTML = `<div class="greet"><p style="margin:0 0 6px">${h(greeting())}</p><h1>Bring color back into your world</h1><p id="sub">Finding what’s happening near you…</p></div>
+    <div id="top"></div><div id="feed"></div>`;
   const draw = async () => {
-    const m = state.month, gridStart = addDays(m, -m.getDay()), gridEnd = addDays(gridStart, 42);
-    let monthEvents = [], listEvents = [], failed = null;
+    const m = state.month, gridStart = addDays(m, -m.getDay()), gridEnd = addDays(gridStart, 42), now = new Date();
+    let monthEvents = [], listEvents = [], week = [], spot = null, failed = null;
     try {
       const listRange = state.day ? [new Date(`${state.day}T00:00:00`), addDays(new Date(`${state.day}T00:00:00`), 1)] : rangeFor(state.filters);
-      [monthEvents, listEvents] = await Promise.all([search(gridStart, gridEnd, 500), search(listRange[0], listRange[1])]);
+      let sp;
+      [monthEvents, listEvents, week, sp] = await Promise.all([
+        search(gridStart, gridEnd, 500), search(listRange[0], listRange[1]), search(now, addDays(startOfDay(now), 8), 12),
+        sb.from('phoenix_events').select('*').eq('is_tpc', true).eq('status', 'published').gte('starts_at', now.toISOString()).order('starts_at').limit(1),
+      ]);
+      spot = sp.data?.[0] ?? null;
     } catch (e) { failed = e; }
-    $('#side').innerHTML = monthHtml(monthEvents) + filtersHtml();
-    wireFilters($('#side'), draw);
+    $('#top').innerHTML = searchRow() + catChips();
+    wireQuick($('#top'), draw);
+    const feed = $('#feed');
+    if (failed) { feed.innerHTML = `<div class="empty"><div class="big">🌧️</div><h2>Couldn’t load events</h2><p>${h(errText(failed))}</p><button class="btn" id="retry">Try again</button></div>`; $('#retry').onclick = draw; return; }
+    $('#sub').textContent = week.length ? `${week.length}${week.length === 12 ? '+' : ''} thing${week.length === 1 ? '' : 's'} happening this week, shared by neighbors and The Phoenix Catalyst.` : 'Local events shared by neighbors and The Phoenix Catalyst.';
+    const heading = state.day ? fmtDay(`${state.day}T12:00:00`) : state.filters.when === 'upcoming' ? 'Coming up' : Object.fromEntries(WHENS)[state.filters.when];
+    const groups = new Map();
+    for (const e of listEvents) { const k = dayKey(e.starts_at) < dayKey(now) ? dayKey(now) : dayKey(e.starts_at); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
+    const list = listEvents.length
+      ? [...groups].map(([k, evs]) => `<div class="daygroup"><h3>${h(k === dayKey(now) ? 'Today' : k === dayKey(addDays(now, 1)) ? 'Tomorrow' : fmtDay(`${k}T12:00:00`))}</h3>${evs.map(evRow).join('')}</div>`).join('')
+      : `<div class="empty"><div class="big">🌱</div><h2>Nothing here yet</h2><p>${activeFilterCount() || state.day ? 'Try fewer filters, or share' : 'Be the first to share'} an event you know about. A photo of a flyer works.</p><a class="btn" href="#/add">Add an event</a></div>`;
+    feed.innerHTML = `${!state.day && week.length ? `<div class="section-h"><h2>This week</h2></div><div class="rail">${week.map(tile).join('')}</div>` : ''}
+      ${!state.day && spot && !state.filters.tpc ? spotlight(spot) : ''}
+      <div class="home" style="margin-top:8px">
+        <aside id="side">${monthHtml(monthEvents)}</aside>
+        <section aria-live="polite"><div class="section-h"><h2>${h(heading)}</h2>${state.day ? '<button class="btn small quiet" id="clearday">Show all</button>' : ''}</div>${list}</section>
+      </div>`;
     $('#prevm').onclick = () => { state.month = new Date(m.getFullYear(), m.getMonth() - 1, 1); draw(); };
     $('#nextm').onclick = () => { state.month = new Date(m.getFullYear(), m.getMonth() + 1, 1); draw(); };
     document.querySelectorAll('.day').forEach((b) => b.onclick = () => { state.day = state.day === b.dataset.day ? null : b.dataset.day; draw(); });
-    const list = $('#list');
-    if (failed) { list.innerHTML = `<div class="empty"><h2>Couldn’t load events</h2><p>${h(errText(failed))}</p><button class="btn" id="retry">Try again</button></div>`; $('#retry').onclick = draw; return; }
-    const heading = state.day ? fmtDay(`${state.day}T12:00:00`) : Object.fromEntries(WHENS)[state.filters.when];
-    if (!listEvents.length) {
-      list.innerHTML = `<h2 style="margin-bottom:12px">${h(heading)}</h2><div class="empty"><h2>Nothing here yet</h2>
-        <p>${activeFilterCount() ? 'Try fewer filters, or share' : 'Share'} an event you know about. A photo of a flyer works.</p>
-        <a class="btn" href="#/add">Add an event</a></div>`;
-      return;
-    }
-    const groups = new Map();
-    for (const e of listEvents) { const k = dayKey(e.starts_at) < dayKey(new Date()) ? dayKey(new Date()) : dayKey(e.starts_at); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
-    list.innerHTML = `<h2 style="margin-bottom:12px">${h(heading)}${state.day ? ' <button class="btn small quiet" id="clearday">Show all upcoming</button>' : ''}</h2>` +
-      [...groups].map(([k, evs]) => `<div class="daygroup"><h3>${k === dayKey(new Date()) ? 'Today' : h(fmtDay(`${k}T12:00:00`))}</h3>${evs.map(evRow).join('')}</div>`).join('');
     $('#clearday')?.addEventListener('click', () => { state.day = null; draw(); });
   };
   await draw();
@@ -422,27 +487,27 @@ async function viewEvent(id) {
   const full = e.volunteer_slots && e.volunteer_count >= e.volunteer_slots;
   const place = [e.location_name, e.address].filter(Boolean).join(', ');
   document.title = `${e.title} · Phoenix Community Calendar`;
+  const ico = (d) => `<span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg></span>`;
+  const host = e.is_tpc ? 'Hosted by The Phoenix Catalyst' : e.organizer ? `Hosted by ${e.organizer}` : CAT[e.category]?.label;
   root.innerHTML = `<article class="detail" data-cat="${h(e.category)}">
-    <p><a href="#/" class="small">Back to calendar</a></p>
+    <a href="#/" class="back">‹ Calendar</a>
     ${e.status !== 'published' ? `<p class="panel error">This event is ${h(e.status)} and only visible to you${isMod() ? ' and moderators' : ''}.</p>` : ''}
-    <h1>${h(e.title)}</h1>
-    <div class="stripe"></div>
-    <p class="muted">${h(CAT[e.category]?.label)}${e.is_tpc ? ' · Hosted by The Phoenix Catalyst' : e.organizer ? ` · Hosted by ${h(e.organizer)}` : ''}</p>
+    <div class="hero ${e.poster_path ? '' : 'gen'}">${e.poster_path ? `<div class="backdrop" style="background-image:url('${h(posterUrl(e.poster_path))}')"></div>` : ''}${cover(e, true)}</div>
+    <header class="ehead"><div class="kicker">${EMOJI[e.category] || ''} ${h(host)}</div><h1>${h(e.title)}</h1></header>
     <div class="facts">
-      <div><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span><b>${h(fmtDay(e.starts_at))}</b><br>${h(whenText(e))}</span></div>
-      ${place ? `<div><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg><span>${h(place)}<br><a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}">Get directions</a></span></div>` : ''}
-      <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9.5a3 3 0 1 1 3 3v2M12 17.5v.5"/></svg><span>${h(Object.fromEntries(COSTS)[e.cost])}${e.tags.length ? ` · ${e.tags.map((t) => h(TAG[t])).join(', ')}` : ''}</span></div>
-      <div><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg><span>${e.going_count} going${e.is_tpc ? ` · ${e.volunteer_count}${e.volunteer_slots ? ` of ${e.volunteer_slots}` : ''} volunteers` : ''}</span></div>
+      <div>${ico('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>')}<span><b>${h(fmtDay(e.starts_at))}</b><br><span class="muted">${h(whenText(e))}</span></span></div>
+      ${place ? `<div>${ico('<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>')}<span><b>${h(e.location_name || e.address)}</b><br>${e.location_name && e.address ? `<span class="muted">${h(e.address)}</span><br>` : ''}<a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}">Get directions</a></span></div>` : ''}
+      <div>${ico('<path d="M3 9a2 2 0 0 0 0 4v5h18v-5a2 2 0 0 0 0-4V6H3z"/><path d="M14 6v12" stroke-dasharray="2 2"/>')}<span><b>${h(COST[e.cost])}</b>${e.tags.length ? `<br><span class="muted">Good for ${e.tags.map((t) => h(TAG[t].toLowerCase())).join(', ')}</span>` : ''}</span></div>
+      <div>${ico('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>')}<span><b>${e.going_count ? `${e.going_count} neighbor${e.going_count === 1 ? '' : 's'} going` : 'Be the first to say you’re going'}</b>${e.is_tpc ? `<br><span class="muted">${e.volunteer_count}${e.volunteer_slots ? ` of ${e.volunteer_slots}` : ''} volunteer spots filled</span>` : ''}</span></div>
     </div>
-    <div class="actions">
-      ${e.is_tpc ? `<button class="btn ${rs === 'volunteer' ? '' : 'ghost'}" id="vol" ${full && rs !== 'volunteer' ? 'disabled' : ''}>${rs === 'volunteer' ? 'You’re volunteering' : full ? 'Volunteer spots full' : 'Volunteer'}</button>` : ''}
-      <button class="btn ${rs === 'going' ? '' : 'ghost'}" id="going">${rs === 'going' ? 'You’re going' : 'I’m going'}</button>
-      <button class="btn quiet" id="addcal">Add to calendar</button>
-      <button class="btn quiet" id="share">Share</button>
+    ${e.description ? `<h2 style="margin:22px 0 8px">About</h2><p class="desc">${h(e.description)}</p>` : ''}
+    ${e.url ? `<p><a target="_blank" rel="noopener nofollow" href="${h(e.url)}">More info from the organizer</a></p>` : ''}
+    <div class="rsvpbar">
+      ${e.is_tpc ? `<button class="btn ${rs === 'volunteer' ? 'on' : 'glow'}" id="vol" ${full && rs !== 'volunteer' ? 'disabled' : ''}>${rs === 'volunteer' ? '✓ Volunteering' : full ? 'Spots full' : '🔥 Volunteer'}</button>` : ''}
+      <button class="btn ${rs === 'going' ? 'on' : e.is_tpc ? 'quiet' : 'glow'}" id="going">${rs === 'going' ? '✓ Going' : 'I’m going'}</button>
+      <button class="btn quiet iconbtn" id="addcal" aria-label="Add to calendar">${SVG.cal}</button>
+      <button class="btn quiet iconbtn" id="share" aria-label="Share">${SVG.share}</button>
     </div>
-    ${e.poster_path ? `<img class="poster" src="${h(posterUrl(e.poster_path))}" alt="Poster for ${h(e.title)}">` : ''}
-    ${e.description ? `<h2 style="margin:18px 0 8px">About this event</h2><p class="desc">${h(e.description)}</p>` : ''}
-    ${e.url ? `<p><a target="_blank" rel="noopener nofollow" href="${h(e.url)}">More info on the organizer’s site</a></p>` : ''}
     <p class="small muted">Posted by @${h(e.created_by_username || 'neighbor')}${e.source === 'poster' ? ' from a poster photo' : ''}. Details can change, so check with the organizer.</p>
     <div class="actions">
       ${mine || isMod() ? `<a class="btn small quiet" href="#/edit/${e.id}">Edit</a>` : ''}
@@ -631,9 +696,9 @@ async function viewAdd() {
   root.innerHTML = `<div class="detail"><h1>Add an event</h1>
     <p class="muted" style="margin-top:8px">Saw a flyer? Snap it and we’ll fill in what we can. Events go live right away. Volunteer moderators look things over.</p>
     <div class="choose">
-      <label><input type="file" accept="image/*" capture="environment" id="snap"><b>Snap a poster</b><span class="muted">Use your camera</span></label>
-      <label><input type="file" accept="image/*" id="pick"><b>Upload a photo</b><span class="muted">Pick a flyer from your photos</span></label>
-      <button type="button" id="manual"><b>Type it in</b><span class="muted">Yoga in the park, a food drive, movie night…</span></button>
+      <label class="hero-opt"><input type="file" accept="image/*" capture="environment" id="snap"><span class="e">📸</span><b>Snap a poster</b><span class="muted">Point your camera at a flyer. We’ll fill in the details.</span></label>
+      <label><input type="file" accept="image/*" id="pick"><span class="e">🖼️</span><b>Upload a photo</b><span class="muted">Pick a flyer from your photos</span></label>
+      <button type="button" id="manual"><span class="e">✍️</span><b>Type it in</b><span class="muted">Yoga in the park, a food drive, movie night…</span></button>
     </div><div id="work"></div></div>`;
   const work = $('#work');
   $('#manual').onclick = () => { work.innerHTML = eventForm(); wireEventForm(null); work.scrollIntoView({ behavior: 'smooth' }); };
@@ -691,14 +756,14 @@ async function viewMap() {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
   const layer = L.layerGroup().addTo(map);
   const draw = async () => {
-    $('#mapfilters').innerHTML = filtersHtml();
-    wireFilters($('#mapfilters'), draw);
+    $('#mapfilters').innerHTML = searchRow() + catChips();
+    wireQuick($('#mapfilters'), draw);
     let events = [];
     try { const [a, b] = rangeFor(state.filters); events = await search(a, b, 500); } catch (e) { toast(errText(e)); }
     layer.clearLayers();
     const placed = events.filter((e) => e.lat != null && e.lng != null);
     for (const e of placed) {
-      const icon = L.divIcon({ className: '', html: `<div class="pin" data-cat="${h(e.category)}"></div>`, iconSize: [22, 22], iconAnchor: [11, 22] });
+      const icon = L.divIcon({ className: '', html: `<div class="pin" data-cat="${h(e.category)}"><span>${EMOJI[e.category] || '✨'}</span></div>`, iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -26] });
       L.marker([e.lat, e.lng], { icon, title: e.title }).addTo(layer)
         .bindPopup(`<b>${h(e.title)}</b><br>${h(fmtShort(e.starts_at))} · ${h(whenText(e))}<br>${h(e.location_name || '')}<br><a href="#/event/${e.id}">See details</a>`);
     }
@@ -808,7 +873,7 @@ function viewAbout() {
     <h1>The Phoenix Catalyst</h1>
     <p style="margin-top:12px;font-size:1.1rem">We strengthen mental, physical, emotional, and environmental well-being through community-driven events. Bringing color back into the world one community at a time.</p>
     <p class="muted">We picture neighborhoods where people know and support one another, local spaces thrive, and home is where you truly thrive.</p>
-    <div class="pillars">${CATS.filter((c) => c.pillar).map((c) => `<div class="pillar" data-cat="${c.key}"><h3>${h(c.pillar)}</h3><p class="small" style="margin:6px 0 0">${h({
+    <div class="pillars">${CATS.filter((c) => c.pillar).map((c) => `<div class="pillar" data-cat="${c.key}"><span class="e" aria-hidden="true">${EMOJI[c.key]}</span><h3>${h(c.pillar)}</h3><p class="small" style="margin:0">${h({
       environmental: 'Cleanups, tree planting, trail care and nature outings that keep our shared spaces beautiful.',
       community: 'Food and donation drives, care visits, potlucks and swaps that rebuild ties between neighbors.',
       wellness: 'Walking and running groups, races, hikes and yoga that make movement accessible to everyone.',

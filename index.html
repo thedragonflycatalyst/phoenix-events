@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Phoenix Community Calendar</title>
   <meta name="description" content="Local community events and The Phoenix Catalyst volunteer calendar. Bring color back into your world.">
-  <meta name="theme-color" content="#1d1f24">
+  <meta name="theme-color" content="#f4f1f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#120e17" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -14,7 +15,7 @@
   <meta property="og:description" content="Find and share local community events. Bring color back into your world.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,500..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -22,7 +23,7 @@
   <header class="top">
     <a class="brand" href="#/">
       <img src="icon.svg" alt="" width="34" height="34">
-      <span><b>Phoenix</b> Community Calendar</span>
+      <span>Phoenix <span>Community</span></span>
     </a>
     <div id="account" class="account"></div>
   </header>
@@ -30,7 +31,7 @@
   <nav class="tabs" aria-label="Main">
     <a href="#/" data-tab="calendar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Calendar</a>
     <a href="#/map" data-tab="map"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>Map</a>
-    <a href="#/add" data-tab="add" class="add"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add event</a>
+    <a href="#/add" data-tab="add" class="add"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add event</span></a>
     <a href="#/mine" data-tab="mine"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v17l-7-4-7 4z"/></svg>My events</a>
     <a href="#/about" data-tab="about"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c2 3 5 4.5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.6 1 2.5 2 3 0-3 0-5 1-7.5z"/></svg>About</a>
   </nav>
