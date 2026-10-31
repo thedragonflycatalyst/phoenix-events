@@ -40,9 +40,12 @@ export async function readPoster(file, onProgress) {
   });
   let pass = 0;
   try {
+    // Posters are scattered text in many sizes: "sparse text" mode finds big headlines that page mode drops.
+    await worker.setParameters({ tessedit_pageseg_mode: '11' });
     const { data } = await worker.recognize(file);
-    // Tesseract often misses very large headline letters; a half-size copy catches them.
+    // Backup pass in normal page mode on a half-size copy, merged in for anything missed.
     pass = 1;
+    await worker.setParameters({ tessedit_pageseg_mode: '3' });
     const small = await scaleImage(file, 0.5).catch(() => null);
     if (small) {
       const { data: d2 } = await worker.recognize(small);
