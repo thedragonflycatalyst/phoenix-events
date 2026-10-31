@@ -35,11 +35,38 @@ export function guessCategory(text, title = '') {
 
 export async function readPoster(file, onProgress) {
   const T = await loadTesseract();
-  const { data } = await T.recognize(file, 'eng', {
-    logger: (m) => { if (m.status === 'recognizing text' && onProgress) onProgress(m.progress); },
+  const worker = await T.createWorker('eng', 1, {
+    logger: (m) => { if (m.status === 'recognizing text' && onProgress) onProgress(pass * 0.5 + m.progress * 0.5); },
   });
-  const chrono = await import('https://esm.sh/chrono-node@2.7.7');
-  return parsePoster(data, chrono);
+  let pass = 0;
+  try {
+    const { data } = await worker.recognize(file);
+    // Tesseract often misses very large headline letters; a half-size copy catches them.
+    pass = 1;
+    const small = await scaleImage(file, 0.5).catch(() => null);
+    if (small) {
+      const { data: d2 } = await worker.recognize(small);
+      const seen = new Set(data.lines.map((l) => norm(l.text)));
+      const extra = d2.lines.filter((l) => norm(l.text).length >= 3 && !seen.has(norm(l.text)))
+        .map((l) => ({ ...l, bbox: { x0: l.bbox.x0 * 2, x1: l.bbox.x1 * 2, y0: l.bbox.y0 * 2, y1: l.bbox.y1 * 2 } }));
+      if (extra.length) {
+        data.lines = [...data.lines, ...extra].sort((a, b) => a.bbox.y0 - b.bbox.y0);
+        data.text = data.lines.map((l) => l.text.trim()).join('\n');
+      }
+    }
+    const chrono = await import('https://esm.sh/chrono-node@2.7.7');
+    return parsePoster(data, chrono);
+  } finally {
+    worker.terminate();
+  }
+}
+const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+async function scaleImage(file, factor) {
+  const bmp = await createImageBitmap(file);
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(bmp.width * factor)); c.height = Math.max(1, Math.round(bmp.height * factor));
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((res) => c.toBlob(res, 'image/png'));
 }
 
 export function parsePoster(data, chrono) {
