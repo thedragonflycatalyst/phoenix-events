@@ -84,8 +84,11 @@ export function parsePoster(data, chrono) {
 
   // Dates and times
   const ref = new Date();
-  const results = chrono.parse(text, ref, { forwardDate: true });
-  const dated = results.find((r) => r.start.isCertain('day') || r.start.isCertain('weekday'));
+  // "Nov 14 · 9:30am" often reads as "Nov 14 - 9:30am", which looks like a range; treat the separator as "at"
+  const dateish = text.replace(/((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?)\s+[-–—·•|@]\s+(?=\d{1,2}(?::\d{2})?\s*[ap]\.?m)/gi, '$1 at ');
+  const results = chrono.parse(dateish, ref, { forwardDate: true });
+  const dated = results.find((r) => r.start.isCertain('month') && r.start.isCertain('day'))
+    || results.find((r) => r.start.isCertain('day') || r.start.isCertain('weekday'));
   if (dated) {
     found.start = dated.start.date();
     if (dated.end) found.end = dated.end.date();
@@ -105,14 +108,15 @@ export function parsePoster(data, chrono) {
 
   // Title: the largest text on the poster that isn't the date
   const used = new Set();
-  const dateText = results.map((r) => r.text.toLowerCase());
-  const isDateLine = (t) => dateText.some((d) => t.toLowerCase().includes(d) || d.includes(t.toLowerCase())) || chrono.parse(t, ref).length > 0;
+  const dateText = (chrono.strict ?? chrono).parse(dateish, ref).map((r) => r.text.toLowerCase());
+  const isDateLine = (t) => dateText.some((d) => t.toLowerCase().includes(d) || d.includes(t.toLowerCase())) || (chrono.strict ?? chrono).parse(t, ref).length > 0;
   const candidates = lines.filter((l) => !isDateLine(l.text) && !ADDRESS.test(l.text) && l.text.length <= 80);
   candidates.sort((a, b) => b.h - a.h);
   if (candidates[0]) {
     // Join a second line of the same size ("HAUNTED" / "TRAIL")
     const top = candidates[0];
-    const twin = candidates.find((l) => l !== top && Math.abs(l.h - top.h) <= top.h * 0.15);
+    // A headline often wraps onto the next line in slightly different-looking letters
+    const twin = candidates.find((l) => l !== top && l.h >= top.h * 0.7 && l.h <= top.h * 1.3 && Math.abs(lines.indexOf(l) - lines.indexOf(top)) === 1);
     const idxTop = lines.indexOf(top), idxTwin = twin ? lines.indexOf(twin) : -1;
     let title = top.text;
     used.add(top);
