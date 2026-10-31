@@ -274,7 +274,7 @@ const tileWhen = (e) => (e.all_day ? `${relDay(e.starts_at)}, all day` : `${relD
 function cover(e, withAlt = false) {
   const art = e.poster_path
     ? `<img src="${h(posterUrl(e.poster_path))}" alt="${withAlt ? `Poster for ${h(e.title)}` : ''}" loading="lazy">${e.is_tpc ? '<span class="tpc">Phoenix Catalyst</span>' : ''}`
-    : `<div class="gen" aria-hidden="true"><span class="glyph">${EMOJI[e.category] || '✨'}</span><span class="ptitle">${h(e.title)}</span></div>`;
+    : `<div class="gen" aria-hidden="true"><span class="ghost">${EMOJI[e.category] || '✨'}</span><span class="glyph">${EMOJI[e.category] || '✨'}</span><span class="ptitle">${h(e.title)}</span></div>`;
   return `<div class="cover" data-cat="${h(e.category)}">${art}<span class="stamp" aria-hidden="true"><small>${h(monShort(e.starts_at))}</small><b>${new Date(e.starts_at).getDate()}</b></span></div>`;
 }
 function tile(e) {
@@ -410,10 +410,8 @@ async function viewCalendar() {
     if (failed) { feed.innerHTML = `<div class="empty"><div class="big">🌧️</div><h2>Couldn’t load events</h2><p>${h(errText(failed))}</p><button class="btn" id="retry">Try again</button></div>`; $('#retry').onclick = draw; return; }
     $('#sub').textContent = week.length ? `${week.length}${week.length === 12 ? '+' : ''} thing${week.length === 1 ? '' : 's'} happening this week, shared by neighbors and The Phoenix Catalyst.` : 'Local events shared by neighbors and The Phoenix Catalyst.';
     const heading = state.day ? fmtDay(`${state.day}T12:00:00`) : state.filters.when === 'upcoming' ? 'Coming up' : Object.fromEntries(WHENS)[state.filters.when];
-    const groups = new Map();
-    for (const e of listEvents) { const k = dayKey(e.starts_at) < dayKey(now) ? dayKey(now) : dayKey(e.starts_at); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
     const list = listEvents.length
-      ? [...groups].map(([k, evs]) => `<div class="daygroup"><h3>${h(k === dayKey(now) ? 'Today' : k === dayKey(addDays(now, 1)) ? 'Tomorrow' : fmtDay(`${k}T12:00:00`))}</h3>${evs.map(evRow).join('')}</div>`).join('')
+      ? listEvents.map(evRow).join('')
       : `<div class="empty"><div class="big">🌱</div><h2>Nothing here yet</h2><p>${activeFilterCount() || state.day ? 'Try fewer filters, or share' : 'Be the first to share'} an event you know about. A photo of a flyer works.</p><a class="btn" href="#/add">Add an event</a></div>`;
     feed.innerHTML = `${!state.day && week.length ? `<div class="section-h"><h2>This week</h2></div><div class="rail">${week.map(tile).join('')}</div>` : ''}
       ${!state.day && spot && !state.filters.tpc ? spotlight(spot) : ''}

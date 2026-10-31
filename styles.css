@@ -129,7 +129,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 @media (min-width: 960px) { .home { grid-template-columns: minmax(0, 1fr) 380px; align-items: start; } .home > aside { grid-column: 2; grid-row: 1; position: sticky; top: 12px; margin-top: 64px; } }
 
 /* poster carousel */
-.rail { display: grid; grid-auto-flow: column; grid-auto-columns: min(66vw, 250px); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory;
+.rail { display: grid; grid-auto-flow: column; grid-auto-columns: min(60vw, 236px); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory;
   padding: 4px 16px 14px; margin: 0 -16px; scrollbar-width: none; scroll-padding: 16px; }
 .rail::-webkit-scrollbar { display: none; }
 .tile { scroll-snap-align: start; text-decoration: none; display: block; }
@@ -139,10 +139,11 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 
 /* the poster: real flyer photo, or a generated gig poster in the pillar's color */
 .cover { position: relative; aspect-ratio: 4 / 5; border-radius: var(--r-lg); overflow: hidden; isolation: isolate; box-shadow: var(--lift);
-  background: radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, var(--c) 85%, white) 0%, transparent 55%), color-mix(in oklab, var(--c) 72%, var(--night));
+  background: radial-gradient(110% 70% at 100% 0%, color-mix(in oklab, var(--c) 70%, white) 0%, transparent 60%), radial-gradient(90% 60% at 0% 100%, color-mix(in oklab, var(--c) 55%, var(--night)) 0%, transparent 70%), color-mix(in oklab, var(--c) 88%, var(--night));
   color: #fff; }
 .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .cover .gen { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; padding: 16px; }
+.cover .ghost { position: absolute; right: -14%; bottom: 8%; font-size: 10rem; line-height: 1; opacity: .2; transform: rotate(-14deg); pointer-events: none; }
 .cover .glyph { font-size: 2.1rem; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0,0,0,.25)); }
 .cover .ptitle { font-family: var(--display); font-weight: 800; font-stretch: 75%; font-size: clamp(1.7rem, 7.5vw, 2.3rem); line-height: .95; letter-spacing: -.02em;
   overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
@@ -158,9 +159,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
   background: var(--surface); box-shadow: var(--lift); margin-top: 6px; }
 .spot .cover { aspect-ratio: 1; border-radius: var(--r-md); box-shadow: none; }
 .spot .cover .ptitle { font-size: 1.05rem; }
-.spot .cover .glyph { font-size: 1.5rem; }
+.spot .cover .ghost { position: absolute; right: -14%; bottom: 8%; font-size: 10rem; line-height: 1; opacity: .2; transform: rotate(-14deg); pointer-events: none; }
+.cover .glyph { font-size: 1.5rem; }
 .spot .cover .gen { padding: 10px; }
-.spot .cover .stamp, .spot .cover .tpc { display: none; }
+.spot .cover .stamp, .spot .cover .tpc, .spot .cover .ghost { display: none; }
 .spot .kicker { color: var(--c); font-weight: 700; font-size: .88rem; }
 .spot .t { font-family: var(--display); font-weight: 800; font-size: 1.25rem; line-height: 1.1; margin: 2px 0 6px; }
 .meter { height: 8px; border-radius: 4px; background: var(--soft); overflow: hidden; margin-top: 8px; }
@@ -178,14 +180,16 @@ input:focus, select:focus, textarea:focus { border-color: var(--focus); outline:
 .ticket::before, .ticket::after { content: ''; position: absolute; left: 56px; width: 16px; height: 16px; border-radius: 50%; background: var(--bg); }
 .ticket::before { top: -8px; } .ticket::after { bottom: -8px; }
 .ticket .body { padding: 12px 14px; min-width: 0; }
+.ticket .body > span { display: block; }
 .ticket .t { font-family: var(--display); font-weight: 700; font-size: 1.08rem; line-height: 1.18; }
 .ticket .meta { color: var(--muted); font-size: .88rem; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ticket .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.ticket .body > .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .ticket .thumb { position: relative; }
 .ticket .thumb .cover { position: absolute; inset: 8px 8px 8px 0; aspect-ratio: auto; border-radius: var(--r-sm); box-shadow: none; }
 .ticket .thumb .cover .gen { padding: 6px; justify-content: center; align-items: center; }
-.ticket .thumb .cover .ptitle, .ticket .thumb .cover .stamp, .ticket .thumb .cover .tpc { display: none; }
-.ticket .thumb .cover .glyph { font-size: 1.6rem; }
+.ticket .thumb .cover .ptitle, .ticket .thumb .cover .ghost, .ticket .thumb .cover .stamp, .ticket .thumb .cover .tpc { display: none; }
+.ticket .thumb .cover .ghost { position: absolute; right: -14%; bottom: 8%; font-size: 10rem; line-height: 1; opacity: .2; transform: rotate(-14deg); pointer-events: none; }
+.cover .glyph { font-size: 1.6rem; }
 .badge { font-size: .76rem; padding: 3px 9px; border-radius: 999px; background: var(--soft); color: var(--muted); font-weight: 700; }
 .badge.tpc { background: var(--ink); color: var(--bg); }
 .badge.me { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
