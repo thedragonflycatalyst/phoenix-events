@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useApp } from '@/lib/app-state';
 import { addDays, dayKey } from '@/lib/dates';
+import { geocode } from '@/lib/geo';
 import { CATS, COSTS, errText, TAGS, type PEvent } from '@/lib/model';
 import { sb } from '@/lib/supabase';
 import { F, R, usePalette } from '@/lib/theme';
@@ -36,16 +37,6 @@ function DateTimeField({ label, value, mode, onChange, optional }: { label: stri
       )}
     </View>
   );
-}
-
-async function geocode(q: string): Promise<{ lat: number; lng: number } | null> {
-  try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q=${encodeURIComponent(q)}`, {
-      headers: { 'Accept-Language': 'en', 'User-Agent': 'PhoenixCommunity/1.0 (org.thephoenixcatalyst.community)' },
-    });
-    const [hit] = await r.json();
-    return hit ? { lat: Number(hit.lat), lng: Number(hit.lon) } : null;
-  } catch { return null; }
 }
 
 /** Shared add/edit form. `poster` is a local photo to upload when posting. */

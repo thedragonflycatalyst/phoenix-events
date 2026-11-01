@@ -2,17 +2,21 @@ import type { User } from '@supabase/supabase-js';
 import * as Location from 'expo-location';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addDays, rangeFor, startOfDay } from './dates';
+import type { Near } from './geo';
 import { HOME, type PEvent, type Role, type RsvpKind } from './model';
 import { recall, sb, store, USERNAME_LOGIN_FN, SUPABASE_KEY } from './supabase';
 
-export type Filters = { when: string; cats: string[]; tags: string[]; cost: string[]; tpc: boolean; q: string; radius: number | null };
-const DEFAULT_FILTERS: Filters = { when: 'upcoming', cats: [], tags: [], cost: [], tpc: false, q: '', radius: null };
+// near: null measures distance from the phone's location; otherwise from a ZIP code
+export type Filters = { when: string; cats: string[]; tags: string[]; cost: string[]; tpc: boolean; q: string; radius: number | null; near: Near | null };
+const DEFAULT_FILTERS: Filters = { when: 'upcoming', cats: [], tags: [], cost: [], tpc: false, q: '', radius: null, near: null };
 
 type Ctx = {
   ready: boolean; user: User | null; username: string | null; role: Role; rsvps: Map<string, RsvpKind>;
   isMod: boolean; canTpc: boolean;
   filters: Filters; setFilters: (f: Partial<Filters>) => void; activeFilterCount: number;
   origin: { lat: number; lng: number; mine: boolean } | null;
+  /** Where distances are measured from, in words */
+  originLabel: string;
   dataVersion: number; bump: () => void;
   signIn: (id: string, password: string) => Promise<void>;
   signUp: (email: string, username: string, password: string) => Promise<'signed-in' | 'confirm-email'>;
@@ -65,9 +69,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFiltersState((prev) => { const next = { ...prev, ...f }; store('pe.filters', next); return next; });
   }, []);
 
-  // Distance filtering needs a starting point: the phone's location if allowed, otherwise Columbia, MD
+  // Distance filtering needs a starting point: a chosen ZIP code, else the phone's location if allowed, else Columbia, MD
   useEffect(() => {
-    if (!filters.radius || origin) return;
+    if (!filters.radius || filters.near || origin) return;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -78,11 +82,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } catch { /* fall through */ }
       setOrigin({ lat: HOME.lat, lng: HOME.lng, mine: false });
     })();
-  }, [filters.radius, origin]);
+  }, [filters.radius, filters.near, origin]);
+  const from = filters.near ? { lat: filters.near.lat, lng: filters.near.lng, mine: false } : origin;
+  const originLabel = filters.near ? filters.near.label : origin?.mine ? 'your location' : origin ? HOME.name : 'your location';
 
   const search = useCallback(async (from: Date, to: Date | null, limit = 300, override: Partial<Filters> = {}) => {
     const f = { ...filters, ...override };
-    const o = f.radius ? origin ?? { lat: HOME.lat, lng: HOME.lng } : null;
+    const o = f.radius ? (f.near ? { lat: f.near.lat, lng: f.near.lng } : origin ?? { lat: HOME.lat, lng: HOME.lng }) : null;
     const { data, error } = await sb.rpc('phoenix_search_events', {
       p_from: from.toISOString(), p_to: to ? to.toISOString() : null,
       p_categories: f.cats.length ? f.cats : null, p_tags: f.tags.length ? f.tags : null, p_cost: f.cost.length ? f.cost : null,
@@ -124,13 +130,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isMod: role === 'admin' || role === 'moderator', canTpc: role === 'admin' || role === 'organizer',
     filters, setFilters,
     activeFilterCount: filters.cats.length + filters.tags.length + filters.cost.length + (filters.tpc ? 1 : 0) + (filters.q ? 1 : 0) + (filters.radius ? 1 : 0),
-    origin, dataVersion, bump: () => setDataVersion((v) => v + 1),
+    origin: from, originLabel, dataVersion, bump: () => setDataVersion((v) => v + 1),
     signIn, signUp,
     signOut: async () => { await sb.auth.signOut(); },
     reloadMe: () => loadFor(user),
     setRsvp: (eventId, kind) => setRsvps((prev) => { const m = new Map(prev); if (kind) m.set(eventId, kind); else m.delete(eventId); return m; }),
     search,
-  }), [ready, user, username, role, rsvps, filters, setFilters, origin, dataVersion, signIn, signUp, loadFor, search]);
+  }), [ready, user, username, role, rsvps, filters, setFilters, from, originLabel, origin, dataVersion, signIn, signUp, loadFor, search]);
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

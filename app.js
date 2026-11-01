@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=11';
-import { readPoster, compressImage } from './ocr.js?v=11';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=12';
+import { readPoster, compressImage } from './ocr.js?v=12';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -50,7 +50,7 @@ function whenText(e) {
 const posterUrl = (p) => (p ? sb.storage.from('phoenix-posters').getPublicUrl(p).data.publicUrl : '');
 function store(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* storage unavailable */ } }
 function recall(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
-function loadFilters() { return { when: 'upcoming', cats: [], tags: [], cost: [], tpc: false, q: '', radius: null, ...recall('pe.filters', {}) }; }
+function loadFilters() { return { when: 'upcoming', cats: [], tags: [], cost: [], tpc: false, q: '', radius: null, near: null, ...recall('pe.filters', {}) }; }
 function saveFilters() { store('pe.filters', state.filters); }
 
 let toastTimer;
@@ -226,8 +226,21 @@ function rangeFor(f) {
     default: return [now, null];
   }
 }
+async function lookupZip(zip) {
+  if (!/^\d{5}$/.test(zip)) return null;
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&addressdetails=1&postalcode=${zip}`, { headers: { 'Accept-Language': 'en' } });
+    const [hit] = await r.json();
+    if (!hit) return null;
+    const a = hit.address || {};
+    const town = a.city || a.town || a.village || a.hamlet || a.suburb || a.county || String(hit.display_name || '').split(',')[0];
+    return { zip, lat: Number(hit.lat), lng: Number(hit.lon), label: town ? `${zip} (${town})` : zip };
+  } catch { return null; }
+}
+const originLabel = () => (state.filters.near ? state.filters.near.label : state.loc?.mine === false ? HOME.name : 'your location');
 async function origin() {
   if (!state.filters.radius) return null;
+  if (state.filters.near) return { ...state.filters.near, mine: false };
   if (state.loc) return state.loc;
   state.loc = await new Promise((res) => {
     if (!navigator.geolocation) return res(null);
@@ -309,7 +322,8 @@ function chipRow(items, selected, attr) {
 }
 function catChips() {
   const f = state.filters;
-  return `<div class="chips" role="group" aria-label="Type of event">
+  const where = f.radius ? `<p class="small muted" style="margin:0 0 6px">📍 Within ${f.radius} mi of ${h(originLabel())} · <a href="#" id="fwhere" style="font-weight:700;color:var(--ink)">Change</a></p>` : '';
+  return `${where}<div class="chips" role="group" aria-label="Type of event">
     <button type="button" class="chip" data-quick="all" aria-pressed="${!f.cats.length && !f.tpc}"><span class="e">✨</span>Everything</button>
     <button type="button" class="chip" data-quick="tpc" data-cat="wellness" aria-pressed="${f.tpc}"><span class="e">🔥</span>Volunteer</button>
     ${CATS.slice(0, 5).map((c) => `<button type="button" class="chip" data-cat="${c.key}" data-cat-f="${c.key}" aria-pressed="${f.cats.includes(c.key)}"><span class="e">${EMOJI[c.key]}</span>${h(c.label)}</button>`).join('')}
@@ -330,6 +344,7 @@ function wireQuick(root, rerender) {
   root.querySelector('[data-quick=all]').onclick = () => { f.cats = []; f.tpc = false; saveFilters(); rerender(); };
   root.querySelector('[data-quick=tpc]').onclick = () => { f.tpc = !f.tpc; saveFilters(); rerender(); };
   root.querySelector('#fopen').onclick = () => filterSheet(rerender);
+  root.querySelector('#fwhere')?.addEventListener('click', (e) => { e.preventDefault(); filterSheet(rerender); });
 }
 function filterSheet(rerender) {
   const draft = JSON.parse(JSON.stringify(state.filters));
@@ -339,20 +354,45 @@ function filterSheet(rerender) {
     d.querySelectorAll('[data-tag]').forEach((b) => b.setAttribute('aria-pressed', draft.tags.includes(b.dataset.tag)));
     d.querySelectorAll('[data-cost]').forEach((b) => b.setAttribute('aria-pressed', draft.cost.includes(b.dataset.cost)));
     d.querySelectorAll('[data-radius]').forEach((b) => b.setAttribute('aria-pressed', String(draft.radius ?? '') === b.dataset.radius));
+    d.querySelectorAll('[data-from]').forEach((b) => b.setAttribute('aria-pressed', String(useZip) === b.dataset.from));
+    $('#zipwrap', d).classList.toggle('hidden', !useZip);
   };
+  let useZip = !!state.filters.near;
   openDialog(`<div class="sheet"><h2>Filters</h2>
     <h3>When</h3><div class="chips wrap">${WHENS.map(([k, l]) => `<button type="button" class="chip" data-when="${k}">${l}</button>`).join('')}</div>
+    <h3>Distance</h3><div class="chips wrap">${RADII.map(([k, l]) => `<button type="button" class="chip" data-radius="${k ?? ''}">${l}</button>`).join('')}</div>
+    <h3>Measure from</h3><div class="chips wrap"><button type="button" class="chip" data-from="false">📍 My location</button><button type="button" class="chip" data-from="true">ZIP code</button></div>
+    <div id="zipwrap" class="hidden"><input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="21044" aria-label="ZIP code" value="${h(state.filters.near?.zip || '')}" style="max-width:160px;font-weight:700;letter-spacing:2px">
+      <p class="small muted" style="margin-top:6px">${state.filters.near ? `Using ${h(state.filters.near.label)}` : 'Distances are measured from the center of this ZIP code.'}</p></div>
+    <p class="error" id="ziperr" role="alert"></p>
     <h3>Good for</h3><div class="chips wrap">${chipRow(TAGS, [], 'tag')}</div>
     <h3>Cost</h3><div class="chips wrap">${chipRow(COSTS, [], 'cost')}</div>
-    <h3>Distance</h3><div class="chips wrap">${RADII.map(([k, l]) => `<button type="button" class="chip" data-radius="${k ?? ''}">${l}</button>`).join('')}</div>
     <div class="foot"><button type="button" class="btn ghost" id="freset">Reset</button><button type="button" class="btn" id="fapply">Show events</button></div></div>`, (d) => {
     paint(d);
     d.querySelectorAll('[data-when]').forEach((b) => b.onclick = () => { draft.when = b.dataset.when; paint(d); });
     d.querySelectorAll('[data-tag]').forEach((b) => b.onclick = () => { draft.tags = toggle(draft.tags, b.dataset.tag); paint(d); });
     d.querySelectorAll('[data-cost]').forEach((b) => b.onclick = () => { draft.cost = toggle(draft.cost, b.dataset.cost); paint(d); });
     d.querySelectorAll('[data-radius]').forEach((b) => b.onclick = () => { draft.radius = b.dataset.radius ? Number(b.dataset.radius) : null; paint(d); });
-    $('#freset', d).onclick = () => { Object.assign(draft, { when: 'upcoming', tags: [], cost: [], radius: null }); paint(d); };
-    $('#fapply', d).onclick = () => { Object.assign(state.filters, draft); state.day = null; saveFilters(); d.close(); rerender(); };
+    d.querySelectorAll('[data-from]').forEach((b) => b.onclick = () => { useZip = b.dataset.from === 'true'; paint(d); if (useZip) $('#zip', d).focus(); });
+    $('#zip', d).oninput = (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 5); };
+    $('#freset', d).onclick = () => { Object.assign(draft, { when: 'upcoming', tags: [], cost: [], radius: null, near: null }); useZip = false; $('#zip', d).value = ''; paint(d); };
+    $('#fapply', d).onclick = async (ev) => {
+      const err = $('#ziperr', d); err.textContent = '';
+      draft.near = null;
+      if (useZip) {
+        const zip = $('#zip', d).value;
+        if (!/^\d{5}$/.test(zip)) { err.textContent = 'Enter a 5-digit ZIP code.'; return; }
+        if (state.filters.near?.zip === zip) draft.near = state.filters.near;
+        else {
+          busy(ev.currentTarget, true, 'Finding…');
+          draft.near = await lookupZip(zip);
+          busy(ev.currentTarget, false);
+          if (!draft.near) { err.textContent = 'We couldn’t find that ZIP code. Check it and try again.'; return; }
+        }
+        if (!draft.radius) draft.radius = 10;
+      }
+      Object.assign(state.filters, draft); state.day = null; saveFilters(); d.close(); rerender();
+    };
   });
 }
 

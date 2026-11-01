@@ -32,7 +32,7 @@ export function TopBar() {
 /** Search field, filter button and category chips — shared by Explore and Map. */
 export function SearchAndChips() {
   const p = usePalette();
-  const { filters, setFilters } = useApp();
+  const { filters, setFilters, originLabel } = useApp();
   const extra = filters.tags.length + filters.cost.length + (filters.radius ? 1 : 0) + (filters.when !== 'upcoming' ? 1 : 0);
   const toggleCat = (k: string) => setFilters({ cats: filters.cats.includes(k) ? filters.cats.filter((x) => x !== k) : [...filters.cats, k] });
   return (
@@ -65,6 +65,12 @@ export function SearchAndChips() {
           <Chip key={c.key} label={c.label} emoji={c.emoji} color={p.cat[c.key]} selected={filters.cats.includes(c.key)} onPress={() => toggleCat(c.key)} />
         ))}
       </ScrollView>
+      {filters.radius ? (
+        <Pressable onPress={() => router.push('/filters')} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <Icon name="location_on" size={16} color={p.muted} />
+          <Text style={{ fontFamily: F.body, fontSize: 14, color: p.muted }}>Within {filters.radius} mi of {originLabel} · <Text style={{ fontFamily: F.bodyBold, color: p.ink }}>Change</Text></Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
