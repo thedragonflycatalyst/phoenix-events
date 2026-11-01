@@ -105,4 +105,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete ci-screens --yes --cleanup-tag || true
-          gh release create ci-screens screens/* --prerelease --target "$GITHUB_SHA" --title "CI screenshots" --notes "Automated emulator screenshots for ${GITHUB_SHA::7}. Not an app download."
+          gh release create ci-screens $(find screens -type f -size +0 | sort) --prerelease --target "$GITHUB_SHA" --title "CI screenshots" --notes "Automated emulator screenshots for ${GITHUB_SHA::7}. Not an app download."

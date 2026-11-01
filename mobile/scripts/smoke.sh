@@ -27,4 +27,5 @@ if [ -n "${EVENT_ID:-}" ]; then open "phoenix:///event/$EVENT_ID"; shot 12-event
 adb logcat -d > "$OUT/logcat.txt"
 grep -E "FATAL EXCEPTION|ReactNativeJS.*(Error|Exception)|AndroidRuntime" "$OUT/logcat.txt" | head -50 > "$OUT/errors.txt" || true
 echo "errors: $(wc -l < "$OUT/errors.txt")"
+[ -s "$OUT/errors.txt" ] || echo "No crashes or JavaScript errors found." > "$OUT/errors.txt"
 exit 0
