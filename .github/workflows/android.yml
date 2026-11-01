@@ -43,6 +43,12 @@ jobs:
           npx tsc --noEmit
           npm run -s test:ocr
 
+      - name: Stamp version number
+        # Every build gets the next number: version 1.0.N, shown in the app and in the download's file name
+        run: |
+          node -e "const f='app.json';const j=require('./'+f);j.expo.version='1.0.${{ github.run_number }}';j.expo.android.versionCode=${{ github.run_number }};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+          echo "APP_VERSION=1.0.${{ github.run_number }}" >> "$GITHUB_ENV"
+
       - name: Generate native project
         run: npx expo prebuild --platform android --no-install
         env:
@@ -64,11 +70,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          N=${{ github.run_number }}
+          cp phoenix-community.apk "phoenix-community-v$N.apk"
+          NOTES="Version $APP_VERSION, built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC'). Open this page on your Android phone, download the .apk, and tap it to install (allow installing from your browser if asked)."
+          # Numbered release for this build, kept so every version has its own link
+          gh release create "android-v$N" "phoenix-community-v$N.apk" --prerelease --target "$GITHUB_SHA" \
+            --title "Phoenix Community – Android version $N" --notes "$NOTES"
+          # Rolling "latest" release whose link never changes
           gh release delete android-preview --yes --cleanup-tag || true
-          gh release create android-preview phoenix-community.apk \
-            --prerelease --target "$GITHUB_SHA" \
-            --title "Phoenix Community – Android test build" \
-            --notes "Built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC'). Open this page on your Android phone, download phoenix-community.apk, and tap it to install (allow installing from your browser if asked)."
+          gh release create android-preview phoenix-community.apk "phoenix-community-v$N.apk" --prerelease --target "$GITHUB_SHA" \
+            --title "Phoenix Community – Android test build (latest: version $N)" --notes "$NOTES"
+          # Keep only the 10 newest numbered releases
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^android-v' | sort -t v -k2 -n -r | tail -n +11 | xargs -r -I{} gh release delete {} --yes --cleanup-tag
 
   # Boots an Android emulator, opens every screen and publishes screenshots + log as the "ci-screens" release
   smoke:

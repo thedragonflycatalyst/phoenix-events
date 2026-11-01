@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -55,6 +56,7 @@ export default function About() {
         <Txt v="small" style={{ fontSize: 15, marginTop: 6 }}>Anyone with an account can post events, and they go live right away. Volunteer moderators review posts and remove anything that isn’t a real community event. If something looks wrong, open the event and tap Report a problem.</Txt>
       </Card>
       <Txt v="small" center style={{ marginTop: 18 }}>Bring color back into your world.</Txt>
+      <Txt v="small" center style={{ marginTop: 4 }}>App version {Constants.expoConfig?.version ?? 'dev'}</Txt>
     </ScrollView>
   );
 }

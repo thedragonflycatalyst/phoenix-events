@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -71,6 +72,7 @@ export default function Account() {
         <Txt v="h1" style={{ marginTop: 12 }}>{hasUsername ? app.username : 'Your account'}</Txt>
         <Txt v="small" style={{ fontSize: 15 }}>{email}</Txt>
         <Txt v="small" center style={{ marginTop: 6 }}>One Dragonfly account for every Dragonfly app. Changes here apply everywhere.</Txt>
+        <Txt v="small" center style={{ marginTop: 2 }}>Phoenix Community version {Constants.expoConfig?.version ?? 'dev'}</Txt>
       </View>
 
       {!verified && (
