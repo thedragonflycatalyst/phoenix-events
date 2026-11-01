@@ -1,5 +1,5 @@
 // Home-screen calendar widget: month grid with dots on busy days; tap a day to see its appointments.
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, ListWidget, TextWidget } from 'react-native-android-widget';
 import { dayKey, onDay, type AgendaItem } from './agenda';
 
 type Hex = `#${string}`;
@@ -34,8 +34,8 @@ export function CalendarWidget({ state, items, pal, height }: { state: WidgetSta
     if (hits.length) busy.set(dayKey(d), hits.some((h) => h.source === 'phoenix') ? pal.today : pal.accent);
   }
   const dayItems = onDay(items, sel);
-  const agendaRows = height >= 330 ? 4 : height >= 280 ? 3 : 2;
-  const shown = dayItems.slice(0, agendaRows);
+  // Taller widgets give the agenda more room; it scrolls when the day is busy
+  const agendaFlex = height >= 420 ? 5 : 4;
   const nav = (dm: number) => {
     const d = new Date(state.y, state.m + dm, 1);
     const keepSel = d.getFullYear() === new Date().getFullYear() && d.getMonth() === new Date().getMonth() ? todayKey : dayKey(d);
@@ -68,6 +68,7 @@ export function CalendarWidget({ state, items, pal, height }: { state: WidgetSta
       </FlexWidget>
 
       {/* Month grid */}
+      <FlexWidget style={{ width: 'match_parent', flex: 6, flexDirection: 'column' }}>
       {Array.from({ length: 6 }, (_, r) => (
         <FlexWidget key={`r${r}`} style={{ width: 'match_parent', flexDirection: 'row', flex: 1 }}>
           {Array.from({ length: 7 }, (_, c) => {
@@ -91,27 +92,32 @@ export function CalendarWidget({ state, items, pal, height }: { state: WidgetSta
           })}
         </FlexWidget>
       ))}
+      </FlexWidget>
 
-      {/* Agenda for the chosen day */}
+      {/* Agenda for the chosen day: scrolls inside the widget, "Open" pops out the full list */}
       <FlexWidget clickAction="OPEN_URI" clickActionData={{ uri: `phoenix:///day/${state.sel}` }}
-        style={{ width: 'match_parent', backgroundColor: pal.card, borderRadius: 16, padding: 10, marginTop: 6, flexDirection: 'column' }}>
+        style={{ width: 'match_parent', flex: agendaFlex, backgroundColor: pal.card, borderRadius: 16, padding: 10, marginTop: 6, flexDirection: 'column' }}>
         <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center' }}>
           <TextWidget text={selLabel} style={{ fontSize: 13, color: pal.ink, fontWeight: 'bold' }} />
           <FlexWidget style={{ flex: 1 }} />
-          <TextWidget text={dayItems.length > shown.length ? `+${dayItems.length - shown.length} more ›` : dayItems.length ? 'Open ›' : ''} style={{ fontSize: 12, color: pal.accent, fontWeight: 'bold' }} />
+          <TextWidget text={dayItems.length ? `${dayItems.length} · Open ›` : 'Open ›'} style={{ fontSize: 12, color: pal.accent, fontWeight: 'bold' }} />
         </FlexWidget>
-        {shown.length === 0 ? (
+        {dayItems.length === 0 ? (
           <TextWidget text="Nothing planned. Tap to find events nearby." style={{ fontSize: 12, color: pal.muted, marginTop: 4 }} />
-        ) : shown.map((it) => (
-          <FlexWidget key={it.key} clickAction="OPEN_URI" clickActionData={{ uri: it.uri }}
-            style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', marginTop: 5 }}>
-            <FlexWidget style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: (it.color.startsWith('#') ? it.color : pal.accent) as Hex, marginRight: 8 }} />
-            <TextWidget text={it.allDay ? 'All day' : timeOf(it.start)} style={{ fontSize: 12, color: pal.muted, width: 52 }} />
-            <FlexWidget style={{ flex: 1 }}>
-              <TextWidget text={it.title} truncate="END" maxLines={1} style={{ fontSize: 13, color: pal.ink }} />
-            </FlexWidget>
-          </FlexWidget>
-        ))}
+        ) : (
+          <ListWidget style={{ height: 'match_parent', width: 'match_parent', marginTop: 2 }}>
+            {dayItems.map((it) => (
+              <FlexWidget key={it.key} clickAction="OPEN_URI" clickActionData={{ uri: it.uri }}
+                style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', paddingVertical: 4 }}>
+                <FlexWidget style={{ width: 4, height: 18, borderRadius: 2, backgroundColor: (it.color.startsWith('#') ? it.color : pal.accent) as Hex, marginRight: 8 }} />
+                <TextWidget text={it.allDay ? 'All day' : timeOf(it.start)} style={{ fontSize: 12, color: pal.muted, width: 52 }} />
+                <FlexWidget style={{ flex: 1 }}>
+                  <TextWidget text={it.title} truncate="END" maxLines={1} style={{ fontSize: 13, color: pal.ink }} />
+                </FlexWidget>
+              </FlexWidget>
+            ))}
+          </ListWidget>
+        )}
       </FlexWidget>
     </FlexWidget>
   );
