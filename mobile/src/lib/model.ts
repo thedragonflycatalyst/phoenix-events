@@ -46,7 +46,7 @@ const FRIENDLY: Record<string, string> = {
   phoenix_user_not_found: 'No account has that username.',
   phoenix_cannot_change_own_role: 'Ask another admin to change your own role.',
   dragonfly_username_taken: 'That username is taken. Try another.',
-  dragonfly_username_invalid: 'Usernames are 3–30 letters, numbers, dots, dashes or underscores.',
+  dragonfly_username_invalid: 'Usernames can’t have spaces. Use 3–30 letters, numbers, dots, dashes or underscores.',
   invalid_credentials: 'That username or password didn’t match.',
 };
 export function errText(err: unknown): string {

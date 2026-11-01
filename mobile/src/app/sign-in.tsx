@@ -54,7 +54,9 @@ export default function SignIn() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: p.bg }}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingTop: 32 }}>
         <Txt v="display">{mode === 'in' ? 'Welcome back' : 'Join the community'}</Txt>
-        <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 24 }}>One Dragonfly account works across all Dragonfly apps.</Txt>
+        <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 24 }}>
+          {mode === 'in' ? 'Use the same account you use for the Dragonfly Uploader and other Dragonfly apps.' : 'Already have a Dragonfly account from another Dragonfly app? Sign in with it instead.'}
+        </Txt>
         {mode === 'in' ? (
           <>
             <Field label="Username or email" value={id} onChangeText={setId} autoCapitalize="none" autoComplete="username" autoCorrect={false} />
@@ -63,7 +65,7 @@ export default function SignIn() {
         ) : (
           <>
             <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
-            <Field label="Username" hint="(can’t be changed later)" value={uname} onChangeText={setUname} autoCapitalize="none" autoCorrect={false} autoComplete="username-new" />
+            <Field label="Username" hint="(no spaces, can’t be changed later)" value={uname} onChangeText={(t) => setUname(t.replace(/\s+/g, ''))} autoCapitalize="none" autoCorrect={false} autoComplete="username-new" placeholder="TheDragonflyCatalyst" />
             <Field label="Password" value={pw} onChangeText={setPw} secureTextEntry autoComplete="new-password" />
           </>
         )}
