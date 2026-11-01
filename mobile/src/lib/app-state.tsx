@@ -114,6 +114,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (free === false) throw new Error('dragonfly_username_taken');
     const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username: uname } } });
     if (error) throw error;
+    // Supabase answers a sign-up for an email that already has an account with no identities and sends no email
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('email_already_registered');
     return data.session ? 'signed-in' : 'confirm-email';
   }, []);
 

@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=10';
-import { readPoster, compressImage } from './ocr.js?v=10';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=11';
+import { readPoster, compressImage } from './ocr.js?v=11';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -69,6 +69,7 @@ const FRIENDLY = {
   dragonfly_username_taken: 'That username is taken. Try another.',
   dragonfly_username_invalid: 'Usernames are 3–30 letters, numbers, dots, dashes or underscores.',
   invalid_credentials: 'That username or password didn’t match.',
+  email_already_registered: 'That email already has a Dragonfly account. Choose “I have an account” and sign in with it.',
 };
 function errText(err) {
   const m = err?.message || String(err || '');
@@ -189,6 +190,7 @@ function authDialog(why = '', mode = 'in') {
           if (free === false) throw new Error('dragonfly_username_taken');
           const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username }, emailRedirectTo: redirect } });
           if (error) throw error;
+          if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('email_already_registered');
           if (data.session) { d.close(); toast('Welcome!'); }
           else openDialog(`<h2>Confirm your email</h2><p>We sent a link to <b>${h(email)}</b>. Open it on this device to finish signing up.</p><button class="btn" data-close>OK</button>`);
         }

@@ -48,6 +48,7 @@ const FRIENDLY: Record<string, string> = {
   dragonfly_username_taken: 'That username is taken. Try another.',
   dragonfly_username_invalid: 'Usernames can’t have spaces. Use 3–30 letters, numbers, dots, dashes or underscores.',
   invalid_credentials: 'That username or password didn’t match.',
+  email_already_registered: 'That email already has a Dragonfly account. Tap “I have an account” and sign in with it.',
 };
 export function errText(err: unknown): string {
   const m = (err as { message?: string })?.message || String(err || '');
