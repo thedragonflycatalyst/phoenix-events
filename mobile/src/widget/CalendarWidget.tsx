@@ -34,8 +34,8 @@ export function CalendarWidget({ state, items, pal, height }: { state: WidgetSta
     if (hits.length) busy.set(dayKey(d), hits.some((h) => h.source === 'phoenix') ? pal.today : pal.accent);
   }
   const dayItems = onDay(items, sel);
-  // Taller widgets give the agenda more room; it scrolls when the day is busy
-  const agendaFlex = height >= 420 ? 5 : 4;
+  // The agenda gets a fixed share of the height (it scrolls when the day is busy); the month grid takes the rest
+  const agendaH = Math.max(104, Math.round(height * 0.36));
   const nav = (dm: number) => {
     const d = new Date(state.y, state.m + dm, 1);
     const keepSel = d.getFullYear() === new Date().getFullYear() && d.getMonth() === new Date().getMonth() ? todayKey : dayKey(d);
@@ -68,7 +68,7 @@ export function CalendarWidget({ state, items, pal, height }: { state: WidgetSta
       </FlexWidget>
 
       {/* Month grid */}
-      <FlexWidget style={{ width: 'match_parent', flex: 6, flexDirection: 'column' }}>
+      <FlexWidget style={{ width: 'match_parent', flex: 1, flexDirection: 'column' }}>
       {Array.from({ length: 6 }, (_, r) => (
         <FlexWidget key={`r${r}`} style={{ width: 'match_parent', flexDirection: 'row', flex: 1 }}>
           {Array.from({ length: 7 }, (_, c) => {
@@ -96,7 +96,7 @@ export function CalendarWidget({ state, items, pal, height }: { state: WidgetSta
 
       {/* Agenda for the chosen day: scrolls inside the widget, "Open" pops out the full list */}
       <FlexWidget clickAction="OPEN_URI" clickActionData={{ uri: `phoenix:///day/${state.sel}` }}
-        style={{ width: 'match_parent', flex: agendaFlex, backgroundColor: pal.card, borderRadius: 16, padding: 10, marginTop: 6, flexDirection: 'column' }}>
+        style={{ width: 'match_parent', height: agendaH, backgroundColor: pal.card, borderRadius: 16, padding: 10, marginTop: 6, flexDirection: 'column' }}>
         <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center' }}>
           <TextWidget text={selLabel} style={{ fontSize: 13, color: pal.ink, fontWeight: 'bold' }} />
           <FlexWidget style={{ flex: 1 }} />

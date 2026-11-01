@@ -16,7 +16,7 @@ export default function WidgetPreviewScreen() {
   const [items, setItems] = useState<AgendaItem[]>([]);
   useEffect(() => { const { start, end } = gridRange(state.y, state.m); void loadAgenda(start, end).then(setItems); }, [state.y, state.m]);
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: 16, paddingTop: insets.top + 16, alignItems: 'center' }}>
+    <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24, alignItems: 'center' }}>
       <Txt v="h2" style={{ alignSelf: 'flex-start' }}>Calendar widget</Txt>
       <Txt v="small" style={{ alignSelf: 'flex-start', marginBottom: 16 }}>Long-press your home screen, tap Widgets, and find Phoenix Calendar.</Txt>
       <View>
