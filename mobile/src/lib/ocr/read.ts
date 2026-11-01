@@ -12,3 +12,11 @@ export async function readPoster(imageUri: string): Promise<PosterGuess> {
   const text = lines.map((l) => l.text).join('\n') || result.text;
   return parsePoster(text, lines);
 }
+
+/** Shrinks a photo to a 1600px long edge JPEG: sharp enough to read, small enough to upload. */
+export async function shrinkPhoto(uri: string, width?: number, height?: number): Promise<string> {
+  const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+  const w = width ?? 0, h = height ?? 0;
+  const resize = w >= h ? { width: Math.min(1600, w || 1600) } : { height: Math.min(1600, h || 1600) };
+  return (await manipulateAsync(uri, [{ resize }], { compress: 0.82, format: SaveFormat.JPEG })).uri;
+}

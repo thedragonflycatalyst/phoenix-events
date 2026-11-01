@@ -22,6 +22,9 @@ open "phoenix:///mine";    shot 07-mine 6
 open "phoenix:///about";   shot 08-about 6
 open "phoenix:///sign-in"; shot 09-sign-in 6
 open "phoenix:///filters"; shot 10-filters 6
+open "phoenix:///scan";    shot 10b-scan 8
+adb shell input keyevent KEYCODE_BACK; sleep 2
+adb shell cmd shortcut get-shortcuts --manifest "$PKG" 2>/dev/null | grep -i scan > "$OUT/shortcuts.txt" || echo "scan shortcut NOT registered" > "$OUT/shortcuts.txt"
 adb shell cmd uimode night yes
 adb shell am force-stop "$PKG"; adb shell am start -W -n "$PKG/.MainActivity"
 shot 11-explore-dark 20

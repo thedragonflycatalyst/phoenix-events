@@ -16,6 +16,11 @@ export function TopBar() {
         <Image source={require('../../assets/icon.png')} style={{ width: 34, height: 34, borderRadius: 10 }} accessibilityIgnoresInvertColors />
         <Text style={{ fontFamily: F.displayBold, fontSize: 18, color: p.ink }}>Phoenix <Text style={{ color: p.muted }}>Community</Text></Text>
       </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Scan a flyer" onPress={() => router.push('/scan')} hitSlop={6}
+        style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, backgroundColor: p.soft, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}>
+        <Icon name="document_scanner" size={21} />
+      </Pressable>
       {user ? (
         <Pressable accessibilityLabel={`Your account, ${username}`} onPress={() => router.push('/account')}>
           <Avatar size={40} />
@@ -25,6 +30,7 @@ export function TopBar() {
           <Text style={{ fontFamily: F.bodyBold, color: p.bg }}>Sign in</Text>
         </Pressable>
       )}
+      </View>
     </View>
   );
 }

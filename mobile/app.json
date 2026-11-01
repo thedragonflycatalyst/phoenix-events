@@ -75,8 +75,16 @@
           "locationWhenInUsePermission": "Phoenix shows events near you."
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Phoenix uses your camera to scan event flyers. Flyers are read on your phone.",
+          "recordAudioAndroid": false
+        }
+      ],
       "@maplibre/maplibre-react-native",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/with-scan-shortcut"
     ],
     "experiments": {
       "typedRoutes": true

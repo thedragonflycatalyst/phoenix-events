@@ -1,4 +1,3 @@
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -8,9 +7,17 @@ import { EventForm, type Draft } from '@/components/event-form';
 import { TopBar } from '@/components/header';
 import { Button, Card, Empty, Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
-import { readPoster } from '@/lib/ocr/read';
+import type { PosterGuess } from '@/lib/ocr/parse';
+import { takePendingScan } from '@/lib/ocr/pending';
+import { readPoster, shrinkPhoto } from '@/lib/ocr/read';
 import { F, POSTER, R, usePalette } from '@/lib/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const toDraft = (g: PosterGuess): Draft => ({ title: g.title, category: g.category, start: g.start, end: g.end, all_day: g.allDay, location_name: g.location_name, address: g.address, url: g.url, cost: g.cost, description: g.description });
+const foundText = (g: PosterGuess) => {
+  const got = [g.title && 'name', g.start && 'date', (g.location_name || g.address) && 'place'].filter(Boolean) as string[];
+  return got.length ? `Found the ${got.join(', ')}. Check everything below.` : 'We couldn’t read much from this one. Fill in the details below.';
+};
 
 type Mode = { kind: 'choose' } | { kind: 'reading'; uri: string } | { kind: 'form'; draft: Draft; poster?: string; found?: string };
 
@@ -21,7 +28,11 @@ export default function Add() {
   const { user } = useApp();
   const [mode, setMode] = useState<Mode>({ kind: 'choose' });
   const [formKey, setFormKey] = useState(0);
-  useFocusEffect(useCallback(() => () => { /* keep work in progress when switching tabs */ }, []));
+  // A flyer confirmed in the live scanner arrives here already read
+  useFocusEffect(useCallback(() => {
+    const scan = takePendingScan();
+    if (scan) { setMode({ kind: 'form', poster: scan.uri, found: foundText(scan.guess), draft: toDraft(scan.guess) }); setFormKey((k) => k + 1); }
+  }, []));
 
   if (!user) {
     return (
@@ -29,34 +40,28 @@ export default function Add() {
         <TopBar />
         <View style={{ marginTop: 30 }}>
           <Empty emoji="📸" title="Share an event" body="Sign in to post events. One free account works across all Dragonfly apps."
-            action={<Button title="Sign in or create an account" onPress={() => router.push('/sign-in')} />} />
+            action={<View style={{ gap: 10, alignSelf: 'stretch' }}>
+              <Button title="Sign in or create an account" onPress={() => router.push('/sign-in')} />
+              <Button kind="ghost" icon="document_scanner" title="Scan a flyer into my phone calendar" onPress={() => router.push('/scan')} />
+            </View>} />
         </View>
       </View>
     );
   }
 
-  const fromPhoto = async (camera: boolean) => {
-    const perm = camera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return toast(camera ? 'Allow camera access in Settings to snap flyers' : 'Allow photo access in Settings to pick flyers', false);
-    const res = camera
-      ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1 })
-      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+  const fromLibrary = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) return toast('Allow photo access in Settings to pick flyers', false);
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (res.canceled || !res.assets[0]) return;
-    // Shrink before reading and uploading: long edge 1600px, JPEG
     const a = res.assets[0];
-    const resize = (a.width ?? 0) >= (a.height ?? 0) ? { width: Math.min(1600, a.width || 1600) } : { height: Math.min(1600, a.height || 1600) };
-    const small = await ImageManipulator.manipulateAsync(a.uri, [{ resize }], { compress: 0.82, format: ImageManipulator.SaveFormat.JPEG });
-    setMode({ kind: 'reading', uri: small.uri });
+    const small = await shrinkPhoto(a.uri, a.width, a.height);
+    setMode({ kind: 'reading', uri: small });
     try {
-      const g = await readPoster(small.uri);
-      const got = [g.title && 'name', g.start && 'date', (g.location_name || g.address) && 'place'].filter(Boolean) as string[];
-      setMode({
-        kind: 'form', poster: small.uri,
-        found: got.length ? `Found the ${got.join(', ')}. Check everything below.` : 'We couldn’t read much from this one. Fill in the details below.',
-        draft: { title: g.title, category: g.category, start: g.start, end: g.end, all_day: g.allDay, location_name: g.location_name, address: g.address, url: g.url, cost: g.cost, description: g.description },
-      });
+      const g = await readPoster(small);
+      setMode({ kind: 'form', poster: small, found: foundText(g), draft: toDraft(g) });
     } catch {
-      setMode({ kind: 'form', poster: small.uri, found: 'We couldn’t read this photo. Fill in the details below.', draft: {} });
+      setMode({ kind: 'form', poster: small, found: 'We couldn’t read this photo. Fill in the details below.', draft: {} });
     }
     setFormKey((k) => k + 1);
   };
@@ -90,18 +95,18 @@ export default function Add() {
     <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: 16, paddingTop: insets.top + 4, paddingBottom: 40 }}>
       <TopBar />
       <Txt v="display" style={{ marginTop: 14 }}>Add an event</Txt>
-      <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 20 }}>Saw a flyer? Snap it and we’ll fill in the details. Events go live right away.</Txt>
-      <Pressable onPress={() => fromPhoto(true)} accessibilityRole="button" accessibilityLabel="Snap a flyer with your camera"
+      <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 20 }}>Saw a flyer? Point your camera at it and we’ll fill in the details. Events go live right away.</Txt>
+      <Pressable onPress={() => router.push('/scan')} accessibilityRole="button" accessibilityLabel="Scan a flyer with your camera"
         style={({ pressed }) => ({ borderRadius: R.lg, overflow: 'hidden', minHeight: 190, transform: [{ scale: pressed ? 0.98 : 1 }] })}>
         <LinearGradient colors={[hi, mid, lo]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1, padding: 20, justifyContent: 'flex-end', minHeight: 190 }}>
           <Text style={{ position: 'absolute', right: -10, top: -6, fontSize: 120, opacity: 0.22 }}>📸</Text>
           <Text style={{ fontSize: 34 }}>📸</Text>
-          <Text style={{ fontFamily: F.display, fontSize: 28, color: '#fff', marginTop: 10 }}>Snap a flyer</Text>
-          <Text style={{ fontFamily: F.body, fontSize: 16, color: 'rgba(255,255,255,.85)' }}>Point your camera at a poster</Text>
+          <Text style={{ fontFamily: F.display, fontSize: 28, color: '#fff', marginTop: 10 }}>Scan a flyer</Text>
+          <Text style={{ fontFamily: F.body, fontSize: 16, color: 'rgba(255,255,255,.85)' }}>Point your camera at a poster. We’ll spot the event.</Text>
         </LinearGradient>
       </Pressable>
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-        <Option emoji="🖼️" title="From photos" body="Pick a flyer you saved" onPress={() => fromPhoto(false)} />
+        <Option emoji="🖼️" title="From photos" body="Pick a flyer you saved" onPress={fromLibrary} />
         <Option emoji="✍️" title="Type it in" body="Yoga, food drive, movie night…" onPress={() => { setMode({ kind: 'form', draft: {} }); setFormKey((k) => k + 1); }} />
       </View>
       <Card style={{ marginTop: 20, flexDirection: 'row', gap: 12, alignItems: 'center' }}>

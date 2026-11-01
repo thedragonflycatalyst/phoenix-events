@@ -12,6 +12,9 @@ import { ToastProvider } from '@/components/ui';
 import { AppProvider, useApp } from '@/lib/app-state';
 import { F, usePalette } from '@/lib/theme';
 
+// Links like phoenix:///scan open on top of the tabs, so Back always has somewhere to go
+export const unstable_settings = { initialRouteName: '(tabs)' };
+
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Shell() {
@@ -47,6 +50,7 @@ function Shell() {
         <Stack.Screen name="edit/[id]" options={{ title: 'Edit event' }} />
         <Stack.Screen name="sign-in" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.92], sheetGrabberVisible: true, headerShown: false }} />
         <Stack.Screen name="filters" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.75, 0.95], sheetGrabberVisible: true, headerShown: false }} />
+        <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade_from_bottom', statusBarStyle: 'light' }} />
         <Stack.Screen name="account" options={{ title: 'Account' }} />
         <Stack.Screen name="moderate" options={{ title: 'Review posts' }} />
         <Stack.Screen name="admin" options={{ title: 'Team roles' }} />

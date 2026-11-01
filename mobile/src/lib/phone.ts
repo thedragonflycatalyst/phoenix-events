@@ -74,3 +74,22 @@ export async function cancelReminder(eventId: string) {
   delete all[eventId];
   store('pe.reminders', all);
 }
+
+/** Adds a just-scanned flyer to the phone's calendar (no account needed). */
+export async function addScanToPhoneCalendar(g: { title: string; start: Date; end: Date | null; allDay: boolean; place: string; notes: string }): Promise<'added' | 'denied' | 'no-calendar'> {
+  const { status } = await Calendar.requestCalendarPermissions();
+  if (status !== 'granted') return 'denied';
+  const writable = (await Calendar.getCalendars()).filter((c) => c.allowsModifications);
+  const target = writable.find((c) => c.isPrimary) ?? writable[0];
+  if (!target) return 'no-calendar';
+  await target.createEvent({
+    title: g.title || 'Event from a flyer',
+    startDate: g.start,
+    endDate: g.end ?? new Date(g.start.getTime() + (g.allDay ? 0 : 3600e3)),
+    allDay: g.allDay,
+    location: g.place || undefined,
+    notes: g.notes || undefined,
+    alarms: [{ relativeOffset: -60 }],
+  });
+  return 'added';
+}

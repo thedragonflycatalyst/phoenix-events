@@ -23,6 +23,7 @@ const SF: Partial<Record<AndroidSymbol, SFSymbol>> = {
   close: 'xmark', logout: 'rectangle.portrait.and.arrow.right', edit: 'pencil', delete: 'trash', public: 'globe', event_available: 'calendar.badge.checkmark',
   shield_person: 'person.badge.shield.checkmark', local_fire_department: 'flame', add: 'plus', info: 'info.circle',
   mail: 'envelope', key: 'key', devices: 'laptopcomputer.and.iphone', download: 'square.and.arrow.down', expand_less: 'chevron.up', person: 'person', schedule: 'clock',
+  document_scanner: 'doc.viewfinder', flash_on: 'bolt.fill', flash_off: 'bolt.slash', photo_library: 'photo.on.rectangle',
 };
 export function Icon({ name, size = 22, color }: { name: AndroidSymbol; size?: number; color?: string }) {
   const p = usePalette();
