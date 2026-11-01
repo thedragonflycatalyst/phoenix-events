@@ -11,7 +11,7 @@ import { Card, Icon, Press, Txt } from './ui';
 const open = (id: string) => router.push({ pathname: '/event/[id]', params: { id } });
 
 /** Every event is a poster: the real flyer photo, or a generated gig poster in its pillar's color. */
-export function Poster({ e, style, size = 'tile', insetTop = 0 }: { e: PEvent; style?: StyleProp<ViewStyle>; size?: 'hero' | 'tile' | 'thumb' | 'square'; insetTop?: number }) {
+export function Poster({ e, style, size = 'tile', insetTop = 0, stamp = true }: { e: PEvent; style?: StyleProp<ViewStyle>; size?: 'hero' | 'tile' | 'thumb' | 'square'; insetTop?: number; stamp?: boolean }) {
   const [hi, mid, lo] = POSTER[e.category] ?? POSTER.other;
   const emoji = CAT[e.category]?.emoji ?? '✨';
   const uri = posterUrl(e.poster_path);
@@ -30,7 +30,7 @@ export function Poster({ e, style, size = 'tile', insetTop = 0 }: { e: PEvent; s
           )}
         </View>
       )}
-      {!small && (
+      {!small && stamp && (
         <View style={[styles.stamp, { top: 12 + insetTop }]} accessible={false}>
           <Text style={styles.stampMon}>{monShort(e.starts_at)}</Text>
           <Text style={styles.stampDay}>{new Date(e.starts_at).getDate()}</Text>

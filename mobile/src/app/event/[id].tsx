@@ -111,7 +111,7 @@ export default function EventScreen() {
       <Stack.Screen options={{ headerTintColor: '#fff' }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}>
         <View>
-          <Poster e={e} size="hero" insetTop={insets.top + 44} style={{ borderRadius: 0, aspectRatio: e.poster_path ? 4 / 5 : 5 / 4, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }} />
+          <Poster e={e} size="hero" stamp={e.status !== 'published'} insetTop={insets.top + 44} style={{ borderRadius: 0, aspectRatio: e.poster_path ? 4 / 5 : 5 / 4, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }} />
           {e.status === 'published' && <SocialRail social={social} onLike={toggleLike} onComments={openComments} onShare={share} />}
         </View>
         <View style={{ padding: 16 }}>
