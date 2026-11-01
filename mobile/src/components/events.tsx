@@ -11,7 +11,7 @@ import { Card, Icon, Press, Txt } from './ui';
 const open = (id: string) => router.push({ pathname: '/event/[id]', params: { id } });
 
 /** Every event is a poster: the real flyer photo, or a generated gig poster in its pillar's color. */
-export function Poster({ e, style, size = 'tile' }: { e: PEvent; style?: StyleProp<ViewStyle>; size?: 'hero' | 'tile' | 'thumb' | 'square' }) {
+export function Poster({ e, style, size = 'tile', insetTop = 0 }: { e: PEvent; style?: StyleProp<ViewStyle>; size?: 'hero' | 'tile' | 'thumb' | 'square'; insetTop?: number }) {
   const [hi, mid, lo] = POSTER[e.category] ?? POSTER.other;
   const emoji = CAT[e.category]?.emoji ?? '✨';
   const uri = posterUrl(e.poster_path);
@@ -22,16 +22,16 @@ export function Poster({ e, style, size = 'tile' }: { e: PEvent; style?: StylePr
       {uri ? (
         <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} accessibilityLabel={size === 'hero' ? `Poster for ${e.title}` : undefined} />
       ) : (
-        <View style={[StyleSheet.absoluteFill, { padding: small ? 10 : 16, justifyContent: size === 'thumb' ? 'center' : 'space-between', alignItems: size === 'thumb' ? 'center' : 'flex-start' }]}>
+        <View style={[StyleSheet.absoluteFill, { padding: small ? 10 : 16, paddingTop: (small ? 10 : 16) + insetTop, justifyContent: size === 'thumb' ? 'center' : 'space-between', alignItems: size === 'thumb' ? 'center' : 'flex-start' }]}>
           {size !== 'thumb' && <Text style={[styles.ghost, size === 'hero' && { fontSize: 190 }]}>{emoji}</Text>}
           <Text style={{ fontSize: size === 'hero' ? 40 : small ? 26 : 32 }}>{emoji}</Text>
-          {size !== 'thumb' && (
-            <Text numberOfLines={4} style={[styles.ptitle, size === 'hero' && { fontSize: 40, lineHeight: 40 }, size === 'square' && { fontSize: 18, lineHeight: 19 }]}>{e.title}</Text>
+          {size !== 'thumb' && size !== 'hero' && (
+            <Text numberOfLines={4} style={[styles.ptitle, size === 'square' && { fontSize: 18, lineHeight: 19 }]}>{e.title}</Text>
           )}
         </View>
       )}
       {!small && (
-        <View style={styles.stamp} accessible={false}>
+        <View style={[styles.stamp, { top: 12 + insetTop }]} accessible={false}>
           <Text style={styles.stampMon}>{monShort(e.starts_at)}</Text>
           <Text style={styles.stampDay}>{new Date(e.starts_at).getDate()}</Text>
         </View>

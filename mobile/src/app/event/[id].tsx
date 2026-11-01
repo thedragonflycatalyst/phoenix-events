@@ -102,9 +102,9 @@ export default function EventScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <Stack.Screen options={{ headerTintColor: e.poster_path ? '#fff' : '#fff' }} />
+      <Stack.Screen options={{ headerTintColor: '#fff' }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}>
-        <Poster e={e} size="hero" style={{ borderRadius: 0, aspectRatio: e.poster_path ? 4 / 5 : 5 / 4, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }} />
+        <Poster e={e} size="hero" insetTop={insets.top + 44} style={{ borderRadius: 0, aspectRatio: e.poster_path ? 4 / 5 : 5 / 4, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }} />
         <View style={{ padding: 16 }}>
           {e.status !== 'published' && <Card style={{ marginBottom: 12 }}><Txt v="bold" color={p.danger}>This event is {e.status} and only visible to you{app.isMod ? ' and moderators' : ''}.</Txt></Card>}
           <Txt v="kicker" color={c}>{CAT[e.category]?.emoji} {host}</Txt>
@@ -156,10 +156,10 @@ export default function EventScreen() {
       <View style={[styles.bar, { paddingBottom: insets.bottom + 10, backgroundColor: p.surface, borderTopColor: p.line }]}>
         {e.is_tpc && (
           <Button style={{ flex: 1 }} kind={rs === 'volunteer' ? 'on' : 'accent'} accent={c} busy={busy === 'volunteer'} disabled={full && rs !== 'volunteer'}
-            title={rs === 'volunteer' ? '✓ Volunteering' : full ? 'Spots full' : '🔥 Volunteer'} onPress={() => rsvp('volunteer')} />
+            title={rs === 'volunteer' ? '✓ Volunteering' : full ? 'Spots full' : 'Volunteer'} tight onPress={() => rsvp('volunteer')} />
         )}
         <Button style={{ flex: 1 }} kind={rs === 'going' ? 'on' : e.is_tpc ? 'quiet' : 'accent'} accent={c} busy={busy === 'going'}
-          title={rs === 'going' ? '✓ Going' : 'I’m going'} onPress={() => rsvp('going')} />
+          title={rs === 'going' ? '✓ Going' : 'I’m going'} tight onPress={() => rsvp('going')} />
         <Button kind="quiet" icon={inCal ? 'event_available' : 'calendar_month'} onPress={addCal} />
         <Button kind="quiet" icon="share" onPress={share} />
       </View>

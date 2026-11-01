@@ -30,8 +30,8 @@ export function Icon({ name, size = 22, color }: { name: AndroidSymbol; size?: n
 
 /* ---------- buttons ---------- */
 type BtnKind = 'solid' | 'ghost' | 'quiet' | 'danger' | 'accent' | 'on';
-export function Button({ title, onPress, kind = 'solid', icon, small, busy, disabled, accent, style, haptic = true }: {
-  title?: string; onPress?: () => void; kind?: BtnKind; icon?: AndroidSymbol; small?: boolean; busy?: boolean; disabled?: boolean;
+export function Button({ title, onPress, kind = 'solid', icon, small, busy, disabled, accent, style, haptic = true, tight }: {
+  title?: string; tight?: boolean; onPress?: () => void; kind?: BtnKind; icon?: AndroidSymbol; small?: boolean; busy?: boolean; disabled?: boolean;
   accent?: string; style?: StyleProp<ViewStyle>; haptic?: boolean;
 }) {
   const p = usePalette();
@@ -43,7 +43,7 @@ export function Button({ title, onPress, kind = 'solid', icon, small, busy, disa
       accessibilityRole="button" accessibilityLabel={title} disabled={disabled || busy}
       onPress={() => { if (haptic) Haptics.selectionAsync().catch(() => {}); onPress?.(); }}
       style={({ pressed }) => [
-        { backgroundColor: bg, borderColor: border, borderWidth: 1.5, minHeight: small ? 38 : 50, paddingHorizontal: title ? (small ? 14 : 20) : 0,
+        { backgroundColor: bg, borderColor: border, borderWidth: 1.5, minHeight: small ? 38 : 50, paddingHorizontal: title ? (small ? 14 : tight ? 10 : 20) : 0,
           width: title ? undefined : small ? 38 : 50, borderRadius: R.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
           opacity: disabled ? 0.45 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
         style,
