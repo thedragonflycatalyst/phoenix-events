@@ -50,15 +50,59 @@ jobs:
 
       - name: Build APK
         working-directory: mobile/android
-        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,x86_64 --no-daemon
+
+      - name: Keep APK for the smoke test
+        run: cp android/app/build/outputs/apk/release/app-release.apk phoenix-community.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: mobile/phoenix-community.apk
+          retention-days: 7
 
       - name: Publish test release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk phoenix-community.apk
           gh release delete android-preview --yes --cleanup-tag || true
           gh release create android-preview phoenix-community.apk \
             --prerelease --target "$GITHUB_SHA" \
             --title "Phoenix Community – Android test build" \
             --notes "Built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC'). Open this page on your Android phone, download phoenix-community.apk, and tap it to install (allow installing from your browser if asked)."
+
+  # Boots an Android emulator, opens every screen and publishes screenshots + log as the "ci-screens" release
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Pick a sample event
+        run: |
+          ID=$(curl -s "https://fkksaivdznqbfsfsagsj.supabase.co/rest/v1/phoenix_events?select=id&status=eq.published&order=starts_at&limit=1" \
+            -H "apikey: sb_publishable_ME6Xg1mtUBA4994aC0n6Uw_LKsJDTXu" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')
+          echo "EVENT_ID=$ID" >> "$GITHUB_ENV"
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash mobile/scripts/smoke.sh
+      - name: Publish screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete ci-screens --yes --cleanup-tag || true
+          gh release create ci-screens screens/* --prerelease --target "$GITHUB_SHA" --title "CI screenshots" --notes "Automated emulator screenshots for ${GITHUB_SHA::7}. Not an app download."
