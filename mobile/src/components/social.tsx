@@ -21,7 +21,7 @@ export function NameBadge({ name, size = 34 }: { name: string | null; size?: num
   );
 }
 
-/** Heart that pops when tapped. */
+/** Solid heart drawn from shapes (the ♥ character turns into a red emoji on Android). Pops when turned on. */
 export function Heart({ on, size = 30, idle = '#fff' }: { on: boolean; size?: number; idle?: string }) {
   const pop = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -31,7 +31,15 @@ export function Heart({ on, size = 30, idle = '#fff' }: { on: boolean; size?: nu
       Animated.spring(pop, { toValue: 1, useNativeDriver: true, speed: 20 }),
     ]).start();
   }, [on, pop]);
-  return <Animated.Text style={[{ fontSize: size, lineHeight: size * 1.15, color: on ? '#ff3b5c' : idle, transform: [{ scale: pop }] }, idle === '#fff' && st.shadow]}>♥</Animated.Text>;
+  const color = on ? '#ff3b5c' : idle;
+  const u = size * 0.56; // lobe diameter and square side
+  return (
+    <Animated.View style={{ width: size, height: size, transform: [{ scale: pop }] }}>
+      <View style={{ position: 'absolute', left: (size - u) / 2, top: size * 0.3, width: u, height: u, backgroundColor: color, transform: [{ rotate: '45deg' }] }} />
+      <View style={{ position: 'absolute', left: size * 0.5 - u * 0.86, top: size * 0.12, width: u, height: u, borderRadius: u / 2, backgroundColor: color }} />
+      <View style={{ position: 'absolute', left: size * 0.5 - u * 0.14, top: size * 0.12, width: u, height: u, borderRadius: u / 2, backgroundColor: color }} />
+    </Animated.View>
+  );
 }
 
 export function useSocial(eventId: string) {
@@ -55,13 +63,13 @@ export function SocialRail({ social, onLike, onComments, onShare }: { social: So
   return (
     <View style={st.rail}>
       <RailBtn label={`${social.liked ? 'Unlike' : 'Like'}, ${social.likes} hearts`} onPress={onLike} count={social.likes}>
-        <Heart on={social.liked} />
+        <Heart on={social.liked} size={26} />
       </RailBtn>
       <RailBtn label={`Comments, ${social.comments}`} onPress={onComments} count={social.comments}>
-        <Icon name="chat_bubble" size={28} color="#fff" />
+        <Icon name="chat_bubble" size={24} color="#fff" />
       </RailBtn>
       <RailBtn label="Share" onPress={onShare}>
-        <Icon name="share" size={27} color="#fff" />
+        <Icon name="share" size={23} color="#fff" />
       </RailBtn>
     </View>
   );
@@ -103,9 +111,9 @@ export function CommentsPreview({ eventId, count, refreshKey }: { eventId: strin
 
 const st = StyleSheet.create({
   shadow: { textShadowColor: 'rgba(0,0,0,.55)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
-  rail: { position: 'absolute', right: 12, bottom: 22, alignItems: 'center', gap: 14 },
+  rail: { position: 'absolute', right: 12, bottom: 20, alignItems: 'center', gap: 8 },
   railBtn: { alignItems: 'center' },
-  railCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(0,0,0,.28)', alignItems: 'center', justifyContent: 'center' },
-  railCount: { fontFamily: F.bodyBold, fontSize: 13, color: '#fff', marginTop: 3 },
+  railCircle: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,.28)', alignItems: 'center', justifyContent: 'center' },
+  railCount: { fontFamily: F.bodyBold, fontSize: 13, color: '#fff', marginTop: 2 },
   preview: { marginTop: 22, borderWidth: 1, borderRadius: 18, padding: 16 },
 });
