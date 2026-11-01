@@ -4,9 +4,11 @@ set -u
 PKG=org.thephoenixcatalyst.community
 OUT=screens
 mkdir -p "$OUT"
-shot() { sleep "$2"; adb exec-out screencap -p > "$OUT/$1.png"; echo "shot $1"; }
+# Close slow-emulator system popups (e.g. "Pixel Launcher isn't responding") before each screenshot
+shot() { sleep "$2"; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1; sleep 1; adb exec-out screencap -p > "$OUT/$1.png"; echo "shot $1"; }
 open() { adb shell am start -W -a android.intent.action.VIEW -d "$1" "$PKG" >/dev/null; }
 
+adb shell settings put global hide_error_dialogs 1 || true
 adb install -r -g phoenix-community.apk
 adb logcat -c
 adb shell am start -W -n "$PKG/.MainActivity"
