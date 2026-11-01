@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=13';
-import { readPoster, compressImage } from './ocr.js?v=13';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=14';
+import { readPoster, compressImage } from './ocr.js?v=14';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -59,6 +59,13 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3600);
 }
 const FRIENDLY = {
+  phoenix_tpc_claim: 'Only Phoenix Catalyst leaders can post events hosted by The Phoenix Catalyst. Remove that from the host, name or description.',
+  phoenix_applications_one_open: 'You already have an application waiting for review.',
+  phoenix_application_closed: 'That application was already reviewed.',
+  phoenix_comment_rate_limited: 'You’re commenting a lot. Take a short break and try again.',
+  phoenix_comment_unavailable: 'That comment is no longer available.',
+  phoenix_not_allowed: 'You don’t have permission to do that.',
+  resume_too_big: 'That file is over 10 MB. Try a PDF version.',
   duplicate_event: 'This event is already on the calendar. Search for it instead of posting it again.',
   phoenix_rate_limited: 'You’ve added 20 events today. You can add more tomorrow.',
   phoenix_event_unavailable: 'This event is no longer available.',
@@ -188,7 +195,7 @@ function accountDialog() {
     <div class="row" style="justify-content:center">
       <a class="btn small quiet" href="#/mine" data-close>My events</a>
       ${isMod() ? '<a class="btn small quiet" href="#/moderate" data-close>Review posts</a>' : ''}
-      ${state.role === 'admin' ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a>' : ''}
+      ${state.role === 'admin' ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a><a class="btn small quiet" href="#/applications" data-close>Applications</a>' : ''}
       <button class="btn small ghost" id="signout" type="button">Sign out</button>
     </div>
     <p class="small muted" style="text-align:center;margin-top:12px">Signed-in devices, data export and account deletion are in the Phoenix and Uploader apps.</p>`, (d) => {
@@ -640,6 +647,144 @@ async function addToCalendarDialog(e) {
     <div class="row" style="margin-top:16px"><button class="btn ghost" data-close>Done</button></div>`, wireCopy);
 }
 
+/* ---------- hearts, comments and profile pictures ---------- */
+const picCache = new Map();
+// Signed links to other people's shared Dragonfly pictures (signed-in viewers only), kept for the session
+function picFor(uid) {
+  if (!state.user) return Promise.resolve(null);
+  if (uid === state.user.id && state.avatar) return Promise.resolve(state.avatar);
+  if (!picCache.has(uid)) picCache.set(uid, sb.storage.from(AVATAR_BUCKET).createSignedUrl(avatarPath(uid), 3600).then(({ data }) => data?.signedUrl ?? null, () => null));
+  return picCache.get(uid);
+}
+const PFP_COLORS = ['var(--env)', 'var(--com)', 'var(--well)', 'var(--mind)', 'var(--arts)', 'var(--other)'];
+/** Someone's picture: their colored initial right away, swapped for their profile picture once it loads. */
+function pfp(uid, name, size = 34) {
+  const n = String(name || '?').replace(/^@/, '');
+  let hash = 7; for (const ch of n) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `<span class="pfp" data-uid="${h(uid)}" aria-hidden="true" style="width:${size}px;height:${size}px;background:${PFP_COLORS[hash % PFP_COLORS.length]};font-size:${Math.round(size * 0.44)}px">${h(n.charAt(0).toUpperCase())}</span>`;
+}
+function hydratePfps(root) {
+  root.querySelectorAll('.pfp[data-uid]:not([data-done])').forEach(async (el) => {
+    el.dataset.done = '1';
+    const url = await picFor(el.dataset.uid);
+    if (!url) return;
+    const img = new Image(); img.alt = '';
+    img.onload = () => { el.textContent = ''; el.appendChild(img); };
+    img.src = url;
+  });
+}
+function timeAgo(iso) {
+  const sec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (sec < 60) return 'now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h`;
+  if (sec < 604800) return `${Math.floor(sec / 86400)}d`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+const compact = (n) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : String(n));
+const COMMENT_COLS = 'id,event_id,user_id,username,parent_id,body,like_count,reply_count,created_at';
+
+async function wireSocial(e) {
+  const heart = $('#heart'), hc = $('#hc'), cc = $('#cc'), list = $('#clist'), form = $('#cform'), replyBox = $('#replyto');
+  let soc = { likes: 0, comments: 0, liked: false };
+  const paintSoc = () => {
+    hc.textContent = compact(soc.likes); cc.textContent = compact(soc.comments);
+    heart.setAttribute('aria-pressed', String(soc.liked));
+    heart.setAttribute('aria-label', `${soc.liked ? 'Unlike' : 'Like'} this event, ${soc.likes} hearts`);
+  };
+  sb.rpc('phoenix_event_social', { p_event: e.id }).then(({ data }) => { if (data?.[0]) { soc = { ...data[0] }; paintSoc(); } });
+  heart.onclick = async () => {
+    if (!requireUser('Sign in to heart events.')) return;
+    const like = !soc.liked;
+    soc = { ...soc, liked: like, likes: Math.max(0, soc.likes + (like ? 1 : -1)) }; paintSoc();
+    const { error } = like
+      ? await sb.from('phoenix_event_likes').insert({ event_id: e.id, user_id: state.user.id })
+      : await sb.from('phoenix_event_likes').delete().eq('event_id', e.id).eq('user_id', state.user.id);
+    if (error && !/duplicate key/.test(error.message)) toast(errText(error));
+  };
+
+  let items = [], liked = new Set(), replyTo = null;
+  const open = new Set();
+  const item = (c, reply) => {
+    const mine = c.user_id === state.user?.id, on = liked.has(c.id);
+    return `<li class="cmt${reply ? ' reply' : ''}">${pfp(c.user_id, c.username, reply ? 26 : 34)}<div class="cbody">
+      <div class="cmeta"><b>@${h(c.username || 'neighbor')}</b>${mine ? ' · you' : ''} <span class="muted">· ${h(timeAgo(c.created_at))}</span></div>
+      <p>${h(c.body)}</p>
+      <div class="cacts"><button type="button" class="linkbtn" data-reply="${c.id}">Reply</button>${mine ? `<button type="button" class="linkbtn" data-del="${c.id}">Delete</button>` : isMod() ? `<button type="button" class="linkbtn" data-rm="${c.id}">Remove</button>` : ''}${state.user && !mine ? `<button type="button" class="linkbtn" data-report="${c.id}">Report</button>` : ''}</div></div>
+      <button type="button" class="cheart" data-like="${c.id}" aria-pressed="${on}" aria-label="${on ? 'Unlike' : 'Like'} comment, ${c.like_count} hearts"><span class="heart">♥</span><span>${c.like_count ? compact(c.like_count) : ''}</span></button></li>`;
+  };
+  const paint = () => {
+    soc.comments = items.length; paintSoc();
+    // Newest conversations first; replies stay in order under their comment
+    const tops = items.filter((c) => !c.parent_id).reverse();
+    list.innerHTML = tops.length ? `<ul class="cmts">${tops.map((t) => {
+      const reps = items.filter((r) => r.parent_id === t.id);
+      return item(t) + (reps.length ? (open.has(t.id) ? reps.map((r) => item(r, true)).join('')
+        : `<li class="cmt reply"><button type="button" class="linkbtn" data-open="${t.id}">── View ${reps.length} repl${reps.length === 1 ? 'y' : 'ies'}</button></li>`) : '');
+    }).join('')}</ul>` : '<p class="muted">No comments yet. Ask a question, share a tip, or tell people you’ll be there.</p>';
+    hydratePfps(list);
+  };
+  const load = async () => {
+    const { data, error } = await sb.from('phoenix_comments').select(COMMENT_COLS).eq('event_id', e.id).order('created_at', { ascending: true }).limit(500);
+    if (error) { list.innerHTML = `<p class="error">${h(errText(error))}</p>`; return; }
+    items = data; liked = new Set();
+    if (state.user && items.length) {
+      const { data: mine } = await sb.from('phoenix_comment_likes').select('comment_id').eq('user_id', state.user.id).in('comment_id', items.map((c) => c.id));
+      (mine || []).forEach((m) => liked.add(m.comment_id));
+    }
+    paint();
+  };
+  list.onclick = async (ev) => {
+    const b = ev.target.closest('button'); if (!b) return;
+    const d = b.dataset;
+    if (d.open) { open.add(d.open); paint(); return; }
+    const c = items.find((x) => x.id === (d.like || d.reply || d.del || d.rm || d.report)); if (!c) return;
+    if (d.like) {
+      if (!requireUser('Sign in to heart comments.')) return;
+      const like = !liked.has(c.id);
+      if (like) liked.add(c.id); else liked.delete(c.id);
+      c.like_count = Math.max(0, c.like_count + (like ? 1 : -1)); paint();
+      const { error } = like
+        ? await sb.from('phoenix_comment_likes').insert({ comment_id: c.id, user_id: state.user.id })
+        : await sb.from('phoenix_comment_likes').delete().eq('comment_id', c.id).eq('user_id', state.user.id);
+      if (error && !/duplicate key/.test(error.message)) load();
+    } else if (d.reply) {
+      if (!requireUser('Sign in to reply.')) return;
+      replyTo = c; replyBox.hidden = false;
+      replyBox.innerHTML = `Replying to <b>@${h(c.username || 'neighbor')}</b> <button type="button" class="linkbtn" id="noreply">Cancel</button>`;
+      $('#noreply').onclick = () => { replyTo = null; replyBox.hidden = true; };
+      form?.body.focus();
+    } else if (d.del) {
+      if (!(await confirmDialog('Delete your comment?', 'Replies to it will be deleted too.', 'Delete', true))) return;
+      const { error } = await sb.from('phoenix_comments').delete().eq('id', c.id);
+      if (error) toast(errText(error)); else load();
+    } else if (d.rm) {
+      if (!(await confirmDialog('Remove this comment?', 'It and its replies will be hidden from everyone.', 'Remove', true))) return;
+      const { error } = await sb.rpc('phoenix_remove_comment', { p_comment: c.id });
+      if (error) toast(errText(error)); else { toast('Comment removed'); load(); }
+    } else if (d.report) {
+      const { error } = await sb.from('phoenix_flags').insert({ event_id: e.id, user_id: state.user.id, reason: `Comment by @${c.username || 'neighbor'}: “${c.body.slice(0, 300)}”` });
+      toast(error ? (/duplicate/.test(error.message) ? 'You already reported this event. Moderators will review it.' : errText(error)) : 'Report sent to moderators');
+    }
+  };
+  if (form) {
+    form.body.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); form.requestSubmit(); } });
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const body = form.body.value.trim(); if (!body) return;
+      const btn = form.querySelector('[type=submit]'); busy(btn, true, 'Posting…');
+      try {
+        const { data, error } = await sb.from('phoenix_comments').insert({ event_id: e.id, user_id: state.user.id, body, parent_id: replyTo ? (replyTo.parent_id || replyTo.id) : null }).select(COMMENT_COLS).single();
+        if (error) throw error;
+        items.push(data); if (data.parent_id) open.add(data.parent_id);
+        form.body.value = ''; replyTo = null; replyBox.hidden = true; paint();
+      } catch (err) { toast(errText(err)); } finally { busy(btn, false); }
+    };
+  } else $('#csignin')?.addEventListener('click', () => authDialog('Sign in to comment.'));
+  hydratePfps(document.querySelector('.composer') || document.body);
+  await load();
+}
+
 async function viewEvent(id) {
   const root = main();
   root.innerHTML = '<p class="muted pad">Loading…</p>';
@@ -670,6 +815,8 @@ async function viewEvent(id) {
       <button class="btn quiet iconbtn" id="addcal" aria-label="Add to calendar">${SVG.cal}</button>
       <button class="btn quiet iconbtn" id="share" aria-label="Share">${SVG.share}</button>
     </div>
+    ${e.status === 'published' ? `<div class="social"><button type="button" class="btn quiet" id="heart" aria-pressed="false" aria-label="Like this event"><span class="heart" aria-hidden="true">♥</span> <span id="hc">0</span></button>
+      <a class="btn quiet" href="#comments" id="tocomments"><span aria-hidden="true">💬</span> <span id="cc">0</span> comments</a></div>` : ''}
     <p class="small muted">Posted by @${h(e.created_by_username || 'neighbor')}${e.source === 'poster' ? ' from a poster photo' : ''}. Details can change, so check with the organizer.</p>
     <div class="actions">
       ${mine || isMod() ? `<a class="btn small quiet" href="#/edit/${e.id}">Edit</a>` : ''}
@@ -684,6 +831,12 @@ async function viewEvent(id) {
         ${e.status !== 'removed' ? '<button class="btn small danger" data-mod="removed">Remove</button>' : ''}
       </div></div>` : ''}
     ${e.is_tpc && canTpc() ? '<div class="panel" id="roster"><h3>Volunteers</h3><p class="muted small">Loading…</p></div>' : ''}
+    ${e.status === 'published' ? `<section class="panel comments" id="comments" aria-labelledby="ctitle"><h2 id="ctitle">Comments</h2>
+      <div id="clist"><p class="muted small">Loading…</p></div>
+      <p class="small" id="replyto" hidden></p>
+      ${state.user ? `<form id="cform" class="composer">${pfp(state.user.id, state.username, 36)}<textarea name="body" maxlength="500" rows="1" placeholder="Add a comment…" aria-label="Add a comment"></textarea><button class="btn small" type="submit">Post</button></form>`
+        : '<button type="button" class="btn ghost" id="csignin">Sign in to comment</button>'}
+    </section>` : ''}
   </article>`;
 
   const rsvp = async (kind, btn) => {
@@ -738,6 +891,10 @@ async function viewEvent(id) {
     toast(v === 'ok' ? 'Marked reviewed' : v === 'published' ? 'Restored' : v === 'hidden' ? 'Hidden' : 'Removed');
     viewEvent(e.id);
   });
+  if (e.status === 'published') {
+    $('#tocomments').onclick = (ev) => { ev.preventDefault(); $('#comments').scrollIntoView({ behavior: 'smooth' }); };
+    wireSocial(e);
+  }
   if ($('#roster')) {
     const { data, error: rerr } = await sb.rpc('phoenix_event_volunteers', { p_event: e.id });
     $('#roster').innerHTML = `<h3>Volunteers</h3>${rerr ? `<p class="error">${h(errText(rerr))}</p>` : data.length
@@ -750,8 +907,14 @@ async function viewEvent(id) {
 function localDate(iso) { return iso ? dayKey(iso) : ''; }
 function localTime(iso) { if (!iso) return ''; const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
 
+const CLAIMS_TPC = /phoenix\s*catalyst/i;
 function eventForm(e = {}, note = '') {
   const tags = e.tags || [];
+  // Only Phoenix leaders can mark a flyer's "Hosted by The Phoenix Catalyst"; for leaders it turns on the official switch
+  if (!e.id && CLAIMS_TPC.test(e.organizer || '')) {
+    if (canTpc()) e = { ...e, is_tpc: true };
+    else { e = { ...e, organizer: '' }; note = `${note ? `${note}<br>` : ''}This flyer says it’s hosted by The Phoenix Catalyst. Only Phoenix leaders can post official Phoenix events, so the host was left blank.`; }
+  }
   return `<form class="event" id="evf" novalidate>
     ${note ? `<p class="panel">${note}</p>` : ''}
     <label class="field"><span>Event name</span><input type="text" name="title" maxlength="140" required value="${h(e.title)}"></label>
@@ -778,6 +941,19 @@ function eventForm(e = {}, note = '') {
     <p class="error" id="formerr" role="alert"></p>
     <div class="row"><button class="btn" type="submit">${e.id ? 'Save changes' : 'Post event'}</button><a class="btn ghost" href="${e.id ? `#/event/${e.id}` : '#/'}">Cancel</a></div>
   </form>`;
+}
+
+/** Asks whether a similar event already on the calendar is the same one: 'post', 'open' or 'cancel'. */
+function dupeDialog(dupe) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; resolve(v); } };
+    openDialog(`<h2>Already on the calendar?</h2><p>“${h(dupe.title)}” on ${h(fmtShort(dupe.starts_at))} at ${h(fmtTime(dupe.starts_at))}${dupe.location_name ? ` at ${h(dupe.location_name)}` : ''} looks like the same event.</p>
+      <div class="row"><button class="btn" data-v="open">Open it</button><button class="btn ghost" data-v="post">It’s different, post</button><button class="btn ghost" data-close>Cancel</button></div>`, (d) => {
+      d.addEventListener('close', () => finish('cancel'), { once: true });
+      d.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => { finish(b.dataset.v); d.close(); }));
+    });
+  });
 }
 
 async function geocode(q) {
@@ -817,8 +993,19 @@ function wireEventForm(existing, extras = {}) {
       description: f.description.value.trim() || null,
     };
     if (canTpc()) { row.is_tpc = !!f.is_tpc?.checked; row.volunteer_slots = f.slots?.value ? Number(f.slots.value) : null; }
+    if (!canTpc() && (CLAIMS_TPC.test(row.organizer || '') || CLAIMS_TPC.test(row.title))) { err.textContent = FRIENDLY.phoenix_tpc_claim; f.organizer.focus(); return; }
     busy(btn, true, 'Saving…');
     try {
+      // Safeguard: check for the same event before uploading anything
+      if (!existing) {
+        const { data: dupes } = await sb.rpc('phoenix_find_duplicates', { p_title: title, p_starts_at: row.starts_at, p_address: row.address });
+        const dupe = dupes?.[0];
+        if (dupe) {
+          const choice = await dupeDialog(dupe);
+          if (choice === 'open') { location.hash = `#/event/${dupe.id}`; return; }
+          if (choice !== 'post') { busy(btn, false); return; }
+        }
+      }
       const where = row.address || row.location_name;
       const placeChanged = !existing || existing.address !== row.address || existing.location_name !== row.location_name;
       let unplaced = false;
@@ -968,6 +1155,7 @@ async function viewMine() {
     <h2 style="margin:20px 0 10px">Events you posted</h2>
     ${(posted.data || []).length ? posted.data.map(evRow).join('') : '<p class="muted">You haven’t posted any events yet. <a href="#/add">Add one</a>.</p>'}
     ${isMod() ? '<p style="margin-top:16px"><a class="btn quiet" href="#/moderate">Review community posts</a></p>' : ''}
+    ${state.role === 'admin' ? '<p><a class="btn quiet" href="#/applications">Review applications</a></p>' : ''}
     ${publicFeeds}</div>`;
   wireCopy(root);
   $('#rotate')?.addEventListener('click', async () => {
@@ -1028,28 +1216,198 @@ async function viewAdmin() {
   });
 }
 
-/* ---------- about ---------- */
-function viewAbout() {
+/* ---------- applications: volunteer, organize, moderate ---------- */
+const KINDS = {
+  volunteer: { title: 'Volunteer', emoji: '🌱', blurb: 'Help at clean-ups, plantings, food drives and wellness days. Pick what fits your schedule.' },
+  organizer: { title: 'Event organizer', emoji: '🔥', blurb: 'Plan and lead official Phoenix Catalyst events and volunteer shifts.', grants: 'Lets you post official Phoenix events and see who signed up.' },
+  moderator: { title: 'App moderator', emoji: '🛡️', blurb: 'Keep the community calendar trustworthy: review new posts, reports and comments.', grants: 'Lets you hide or remove posts and comments that break the rules.' },
+};
+const RULES = {
+  volunteer: 'I’ll treat everyone with respect, follow event leaders’ safety instructions, and let the team know if I can’t make a shift.',
+  organizer: 'I’ll only post official Phoenix events that the team has agreed to, keep sign-up details private, and follow The Phoenix Catalyst’s safety and conduct guidelines.',
+  moderator: 'I’ll review posts and comments fairly, never use moderator tools for personal disputes, and keep reporters’ and members’ information private.',
+};
+const INTERESTS = ['Clean-ups & planting', 'Food & donation drives', 'Wellness & fitness days', 'Mental health & support', 'Arts & family fun', 'Setup & teardown', 'Outreach & flyers', 'Photos & social media', 'Driving & deliveries'];
+const FREE_WHEN = ['Weekday mornings', 'Weekday afternoons', 'Weeknights', 'Saturdays', 'Sundays'];
+const RESUME_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'application/rtf', 'image/jpeg', 'image/png', 'image/heic'];
+const RESUME_EXT = '.pdf,.doc,.docx,.txt,.rtf,.jpg,.jpeg,.png,.heic';
+const RESUME_MAX = 10 * 1024 * 1024;
+
+async function myApplications() {
+  if (!state.user) return {};
+  const { data } = await sb.from('phoenix_applications').select('*').eq('user_id', state.user.id).order('created_at', { ascending: false });
+  const out = {};
+  for (const a of data || []) if (!out[a.kind] && a.status !== 'withdrawn') out[a.kind] = a;
+  return out;
+}
+function appStatus(kind, a) {
+  if (kind === 'organizer' && canTpc()) return 'You’re an organizer ✓';
+  if (kind === 'moderator' && isMod()) return 'You’re a moderator ✓';
+  if (!a) return null;
+  return a.status === 'pending' ? 'Application sent · waiting for review' : a.status === 'approved' ? 'Approved ✓' : 'Not approved this time';
+}
+
+async function viewApply(kind) {
+  const root = main();
+  if (!KINDS[kind]) kind = 'volunteer';
+  const info = KINDS[kind];
+  if (!state.user) {
+    root.innerHTML = `<div class="empty detail"><h2>Sign in to apply</h2><p>One free account works across all Dragonfly apps.</p><button class="btn" id="si">Sign in</button></div>`;
+    $('#si').onclick = () => authDialog('Sign in to apply.');
+    return;
+  }
+  document.title = `Apply: ${info.title} · Phoenix Community Calendar`;
+  const chipBoxes = (name, list) => `<div class="chips wrap">${list.map((x) => `<label class="chip"><input type="checkbox" name="${name}" value="${h(x)}" style="accent-color:var(--ink)"> ${h(x)}</label>`).join('')}</div>`;
+  root.innerHTML = `<div class="detail apply"><a href="#/about" class="back">‹ Phoenix</a>
+    <div style="font-size:2.6rem" aria-hidden="true">${info.emoji}</div><h1>${h(info.title)}</h1>
+    <p style="margin-top:8px;font-size:1.1rem">${h(info.blurb)}</p>${info.grants ? `<p class="small muted">${h(info.grants)}</p>` : ''}
+    <form id="appf" novalidate>
+      <div class="panel">
+        <label class="field"><span>Your name</span><input type="text" name="name" maxlength="120" autocomplete="name" required></label>
+        <label class="field"><span>Phone <span class="muted small">(optional, for event-day updates)</span></span><input type="tel" name="phone" maxlength="40" autocomplete="tel"></label>
+        <p class="small muted" style="margin-top:-6px">We’ll also use the email on your account${state.user.email ? ` (${h(state.user.email)})` : ''}.</p>
+        <label class="check"><input type="checkbox" name="adult" checked> I’m 18 or older</label>
+        <p class="small muted" id="minor" hidden>Welcome! Volunteers under 18 need a parent or guardian’s OK, and the team will reach out about that.</p>
+      </div>
+      ${kind === 'volunteer' ? `<div class="panel"><fieldset style="border:0;padding:0;margin:0"><legend><h3>How would you like to help?</h3></legend>${chipBoxes('interests', INTERESTS)}</fieldset>
+        <fieldset style="border:0;padding:0;margin:10px 0 0"><legend><h3>When are you usually free?</h3></legend>${chipBoxes('availability', FREE_WHEN)}</fieldset></div>` : ''}
+      <div class="panel">
+        ${kind !== 'volunteer' ? `<label class="field"><span>${kind === 'organizer' ? 'Events or groups you’ve organized' : 'Moderation or community experience'}</span><textarea name="experience" maxlength="2000" required></textarea></label>` : ''}
+        ${kind === 'organizer' ? '<label class="field"><span>Events you’d love to lead <span class="muted small">(optional)</span></span><textarea name="events" maxlength="2000"></textarea></label>' : ''}
+        ${kind === 'moderator' ? '<label class="field"><span>Hours a week you can give <span class="muted small">(optional)</span></span><input type="text" name="hours" maxlength="40" placeholder="About 2"></label>' : ''}
+        <label class="field"><span>${kind === 'volunteer' ? 'Anything you’d like us to know?' : 'Why do you want to help?'} <span class="muted small">(optional)</span></span><textarea name="about" maxlength="2000"></textarea></label>
+        <label class="field"><span>How did you hear about us? <span class="muted small">(optional)</span></span><input type="text" name="heard" maxlength="200"></label>
+        <label class="field"><span>Resume <span class="muted small">(optional · PDF, Word or photo, up to 10 MB)</span></span><input type="file" name="resume" accept="${RESUME_EXT}"></label>
+      </div>
+      <label class="check agree"><input type="checkbox" name="agree" required> <span>${h(RULES[kind])}</span></label>
+      <p class="error" id="apperr" role="alert"></p>
+      <div class="row"><button class="btn" type="submit">Send application</button><a class="btn ghost" href="#/about">Cancel</a></div>
+      <p class="small muted">Only Phoenix Catalyst admins can see your application.</p>
+    </form></div>`;
+  const f = $('#appf'), err = $('#apperr');
+  f.adult.onchange = () => { $('#minor').hidden = f.adult.checked; };
+  f.resume.onchange = () => {
+    const file = f.resume.files[0];
+    err.textContent = file && file.size > RESUME_MAX ? FRIENDLY.resume_too_big : '';
+  };
+  f.addEventListener('submit', async (ev) => {
+    ev.preventDefault(); err.textContent = '';
+    const val = (n) => (f[n]?.value || '').trim();
+    const picked = (n) => [...f.querySelectorAll(`[name=${n}]:checked`)].map((x) => x.value);
+    if (val('name').length < 2) { err.textContent = 'Add your name.'; f.name.focus(); return; }
+    if (kind === 'volunteer' && !picked('interests').length) { err.textContent = 'Pick at least one way you’d like to help.'; return; }
+    if (kind !== 'volunteer' && val('experience').length < 10) { err.textContent = 'Tell us a little about your experience.'; f.experience.focus(); return; }
+    const file = f.resume.files[0];
+    if (file && file.size > RESUME_MAX) { err.textContent = FRIENDLY.resume_too_big; return; }
+    if (!f.agree.checked) { err.textContent = 'Please agree to the guidelines.'; return; }
+    const btn = f.querySelector('[type=submit]'); busy(btn, true, 'Sending…');
+    let uploaded = null;
+    try {
+      const answers = { name: val('name'), phone: val('phone') || null, email: state.user.email ?? null, adult: f.adult.checked, about: val('about') || null, heard: val('heard') || null, agreed: RULES[kind] };
+      if (kind === 'volunteer') Object.assign(answers, { interests: picked('interests'), availability: picked('availability') });
+      if (kind === 'organizer') Object.assign(answers, { experience: val('experience'), events: val('events') || null });
+      if (kind === 'moderator') Object.assign(answers, { experience: val('experience'), hours: val('hours') || null });
+      if (file) {
+        busy(btn, true, 'Uploading resume…');
+        const ext = (file.name.split('.').pop() || 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'pdf';
+        const type = RESUME_TYPES.includes(file.type) ? file.type : 'application/pdf';
+        const path = `${state.user.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await sb.storage.from('phoenix-resumes').upload(path, file, { contentType: type });
+        if (upErr) throw upErr;
+        uploaded = path;
+        answers.resume = { path, name: file.name.slice(0, 120), size: file.size };
+      }
+      busy(btn, true, 'Sending…');
+      const { error } = await sb.from('phoenix_applications').insert({ user_id: state.user.id, kind, answers });
+      if (error) throw error;
+      toast('Application sent! The team will get back to you here.');
+      location.hash = '#/about';
+    } catch (e2) {
+      if (uploaded) await sb.storage.from('phoenix-resumes').remove([uploaded]);
+      err.textContent = errText(e2); busy(btn, false);
+    }
+  });
+}
+
+const APP_LABELS = { name: 'Name', email: 'Email', phone: 'Phone', adult: '18 or older', interests: 'Wants to help with', availability: 'Free', experience: 'Experience', events: 'Would lead', hours: 'Hours a week', about: 'About', heard: 'Heard about us' };
+const showAnswer = (v) => (Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v));
+
+async function viewApplications() {
+  const root = main();
+  if (state.role !== 'admin') { root.innerHTML = '<div class="empty detail"><h2>Admins only</h2></div>'; return; }
+  root.innerHTML = '<p class="muted pad">Loading…</p>';
+  const { data, error } = await sb.from('phoenix_applications').select('*').eq('status', 'pending').order('created_at', { ascending: true });
+  if (error) { root.innerHTML = `<div class="empty detail"><p class="error">${h(errText(error))}</p></div>`; return; }
+  root.innerHTML = `<div class="detail"><h1>Applications</h1>
+    ${data.length ? data.map((a) => `<div class="panel app" data-id="${a.id}">
+      <div class="kicker">${KINDS[a.kind].emoji} ${h(KINDS[a.kind].title)}</div><h2>@${h(a.username || 'neighbor')}</h2>
+      <p class="small muted">Applied ${h(fmtShort(a.created_at))}</p>
+      <dl class="answers">${Object.entries(a.answers).filter(([k, v]) => k !== 'agreed' && k !== 'resume' && v !== null && v !== '' && !(Array.isArray(v) && !v.length))
+        .map(([k, v]) => `<dt>${h(APP_LABELS[k] || k)}</dt><dd>${h(showAnswer(v))}</dd>`).join('')}</dl>
+      ${a.answers.agreed ? '<p class="small muted">✓ Agreed to the guidelines</p>' : ''}
+      ${a.answers.resume ? `<p><button type="button" class="btn small ghost" data-resume="${h(a.answers.resume.path)}">Open resume · ${h(a.answers.resume.name)}</button></p>` : ''}
+      <label class="field"><span>Note to the applicant <span class="muted small">(optional)</span></span><textarea name="note" maxlength="1000"></textarea></label>
+      <div class="row"><button class="btn" data-approve="1">Approve</button><button class="btn ghost" data-approve="0">Decline</button></div></div>`).join('')
+      : '<div class="empty"><h2>No applications waiting</h2><p>New applications to volunteer, organize or moderate show up here.</p></div>'}</div>`;
+  root.querySelectorAll('[data-resume]').forEach((b) => b.onclick = async () => {
+    const win = window.open('', '_blank');
+    const { data: link, error: e2 } = await sb.storage.from('phoenix-resumes').createSignedUrl(b.dataset.resume, 600);
+    if (e2 || !link?.signedUrl) { win?.close(); toast(errText(e2 || new Error('That resume couldn’t be opened.'))); return; }
+    if (win) win.location = link.signedUrl; else location.href = link.signedUrl;
+  });
+  root.querySelectorAll('[data-approve]').forEach((b) => b.onclick = async () => {
+    const card = b.closest('.app'), approve = b.dataset.approve === '1';
+    busy(b, true);
+    const { error: e2 } = await sb.rpc('phoenix_review_application', { p_id: card.dataset.id, p_approve: approve, p_note: card.querySelector('[name=note]').value.trim() || null });
+    if (e2) { toast(errText(e2)); busy(b, false); return; }
+    toast(approve ? 'Approved' : 'Declined'); card.remove();
+    if (!root.querySelector('.app')) viewApplications();
+  });
+}
+
+/* ---------- about: volunteer hub, mission and donations ---------- */
+async function viewAbout() {
   const links = Object.entries(DONATE_LINKS).filter(([, u]) => u);
+  const shifts = [...state.rsvps.values()].filter((k) => k === 'volunteer').length;
   main().innerHTML = `<div class="detail">
     <h1>The Phoenix Catalyst</h1>
     <p style="margin-top:12px;font-size:1.1rem">We strengthen mental, physical, emotional, and environmental well-being through community-driven events. Bringing color back into the world one community at a time.</p>
+    <div class="sechead"><h2>Volunteer opportunities</h2><a href="#/" id="seevol" class="small">See all</a></div>
+    ${shifts ? `<p class="small muted">You’re signed up for ${shifts} shift${shifts === 1 ? '' : 's'}. They’re in <a href="#/mine">My events</a>.</p>` : ''}
+    <div id="volrail"><p class="muted small">Loading…</p></div>
+    <h2 style="margin-top:26px">Get involved</h2>
+    <div class="involve" id="involve"></div>
+    <h2 style="margin-top:26px">What we do</h2>
     <p class="muted">We picture neighborhoods where people know and support one another, local spaces thrive, and home is where you truly thrive.</p>
     <div class="pillars">${CATS.filter((c) => c.pillar).map((c) => `<div class="pillar" data-cat="${c.key}"><span class="e" aria-hidden="true">${EMOJI[c.key]}</span><h3>${h(c.pillar)}</h3><p class="small" style="margin:0">${h({
       environmental: 'Cleanups, tree planting, trail care and nature outings that keep our shared spaces beautiful.',
       community: 'Food and donation drives, care visits, potlucks and swaps that rebuild ties between neighbors.',
       wellness: 'Walking and running groups, races, hikes and yoga that make movement accessible to everyone.',
       mental: 'Meditation, sound baths, journaling circles and awareness campaigns that support emotional resilience.' }[c.key])}</p></div>`).join('')}</div>
-    <div class="row"><a class="btn" href="#/" id="seevol">See volunteer events</a><a class="btn ghost" href="#/add">Share a community event</a></div>
+    <div class="row"><a class="btn ghost" href="#/add">Share a community event</a></div>
     <div class="panel" style="margin-top:20px"><h2>Support our work</h2>
       <p class="muted">The Phoenix Catalyst is a Maryland 501(c)(3) nonprofit. This app is free for everyone, and donations keep it running.</p>
-      ${links.length ? `<div class="donate">${links.map(([k, u]) => `<a class="btn ${k === 'custom' ? 'ghost' : ''}" target="_blank" rel="noopener" href="${h(u)}">${k === 'custom' ? 'Other amount' : `$${k}`}</a>`).join('')}</div>`
+      ${links.length || PAYPAL_DONATE ? `<div class="donate">${links.map(([k, u]) => `<a class="btn ${k === 'custom' ? 'ghost' : ''}" target="_blank" rel="noopener" href="${h(u)}">${k === 'custom' ? 'Other amount' : `$${k}`}</a>`).join('')}${PAYPAL_DONATE ? `<a class="btn ghost" target="_blank" rel="noopener" href="${h(PAYPAL_DONATE)}">Donate with PayPal</a>` : ''}</div>`
         : '<p><b>Online donations are opening soon.</b></p>'}
     </div>
     <div class="panel"><h2>How posting works</h2>
       <p>Anyone with an account can post events, and they go live right away. Volunteer moderators review posts and remove anything that isn’t a real community event. If something looks wrong, open the event and choose Report a problem.</p></div>
   </div>`;
   $('#seevol').onclick = () => { Object.assign(state.filters, { tpc: true, when: 'upcoming' }); state.day = null; saveFilters(); };
+  const [{ data: ev }, apps, pending] = await Promise.all([
+    sb.from('phoenix_events').select('*').eq('is_tpc', true).eq('status', 'published').gte('starts_at', new Date().toISOString()).order('starts_at').limit(10),
+    myApplications(),
+    state.role === 'admin' ? sb.from('phoenix_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending') : Promise.resolve({ count: 0 }),
+  ]);
+  if (!$('#volrail')) return; // navigated away
+  $('#volrail').innerHTML = ev?.length ? `<div class="rail">${ev.map(tile).join('')}</div>`
+    : '<div class="panel"><p class="small muted" style="margin:0">No volunteer events are scheduled right now. Apply below and we’ll let you know when the next one is up.</p></div>';
+  $('#involve').innerHTML = Object.entries(KINDS).map(([k, info]) => {
+    const st = appStatus(k, apps[k]);
+    const done = st && !st.startsWith('Not');
+    return `<div class="panel gi"><span class="e" aria-hidden="true">${info.emoji}</span><div><h3>${h(info.title)}</h3><p class="small muted" style="margin:0">${h(st || info.blurb)}</p></div>
+      ${done ? '' : `<a class="btn small" href="#/apply/${k}" aria-label="Apply: ${h(info.title)}">Apply</a>`}</div>`;
+  }).join('') + (state.role === 'admin' ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '');
 }
 
 /* ---------- router ---------- */
@@ -1057,7 +1415,7 @@ async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, id] = hash.split('/');
   document.title = 'Phoenix Community Calendar';
-  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about' }[page] ?? '';
+  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about' }[page] ?? '';
   document.querySelectorAll('.tabs a').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
   try {
@@ -1068,7 +1426,9 @@ async function route() {
     else if (page === 'mine') await viewMine();
     else if (page === 'moderate') await viewModerate();
     else if (page === 'admin') await viewAdmin();
-    else if (page === 'about') viewAbout();
+    else if (page === 'about') await viewAbout();
+    else if (page === 'apply') await viewApply(id);
+    else if (page === 'applications') await viewApplications();
     else await viewCalendar();
   } catch (e) {
     main().innerHTML = `<div class="empty"><h2>Something went wrong</h2><p>${h(errText(e))}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;

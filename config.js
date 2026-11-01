@@ -14,5 +14,8 @@ export const DONATE_LINKS = {
   custom: '',
 };
 
+// The Phoenix Catalyst's PayPal donate link (a PayPal donate button link or paypal.me). Empty hides it.
+export const PAYPAL_DONATE = '';
+
 // Default map center when the viewer hasn't shared location (Columbia, MD).
 export const HOME = { lat: 39.2037, lng: -76.8610, name: 'Columbia, MD' };

@@ -93,7 +93,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 0 16px 24px; outline: none; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 label.field { display: block; margin-bottom: 16px; }
 label.field > span { display: block; font-weight: 700; margin-bottom: 6px; font-size: .95rem; }
-input[type=text], input[type=email], input[type=password], input[type=url], input[type=search], input[type=date], input[type=time], input[type=number], select, textarea {
+input[type=text], input[type=tel], input[type=email], input[type=password], input[type=url], input[type=search], input[type=date], input[type=time], input[type=number], select, textarea {
   width: 100%; min-height: 50px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
 }
 textarea { min-height: 120px; resize: vertical; }
@@ -306,3 +306,38 @@ dialog h2 { margin-bottom: 12px; }
 .list-plain li { padding: 10px 0; border-bottom: 1px solid var(--line); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* hearts and comments */
+.social { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 14px; }
+.heart { font-size: 1.25rem; line-height: 1; color: var(--muted); transition: transform .15s ease; display: inline-block; }
+[aria-pressed="true"] > .heart { color: #ff3b5c; transform: scale(1.15); }
+.comments h2 { margin-bottom: 12px; }
+.cmts { list-style: none; margin: 0; padding: 0; }
+.cmt { display: flex; gap: 10px; padding: 10px 0; align-items: flex-start; }
+.cmt.reply { padding-left: 44px; }
+.cbody { flex: 1; min-width: 0; }
+.cbody p { margin: 2px 0 4px; overflow-wrap: anywhere; }
+.cmeta { font-size: .9rem; color: var(--muted); }
+.cmeta b { color: var(--ink); }
+.cacts { display: flex; gap: 16px; }
+.linkbtn { background: none; border: 0; padding: 4px 0; min-height: 32px; color: var(--muted); font-weight: 700; font-size: .9rem; cursor: pointer; }
+.linkbtn:hover { color: var(--ink); }
+.cheart { background: none; border: 0; display: flex; flex-direction: column; align-items: center; min-width: 40px; min-height: 44px; padding: 4px; cursor: pointer; color: var(--muted); font-size: .8rem; }
+.pfp { flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-family: var(--display); font-weight: 800; overflow: hidden; }
+.pfp img { width: 100%; height: 100%; object-fit: cover; }
+.composer { display: flex; gap: 10px; align-items: flex-end; margin-top: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.composer textarea { flex: 1; min-width: 0; min-height: 44px; max-height: 140px; resize: vertical; border-radius: var(--r-md); border: 1.5px solid var(--line); background: var(--soft); padding: 10px 14px; }
+
+/* volunteer hub and applications */
+.sechead { display: flex; align-items: baseline; justify-content: space-between; margin: 26px 0 8px; }
+.involve { display: grid; gap: 10px; margin-top: 12px; }
+.involve .panel.gi { display: flex; gap: 12px; align-items: center; margin: 0; }
+.gi .e { font-size: 1.9rem; }
+.gi > div { flex: 1; min-width: 0; }
+.apply .check.agree { align-items: flex-start; margin: 12px 0; }
+.apply .check.agree input { margin-top: 3px; flex: none; }
+.answers { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 10px 0; }
+.answers dt { font-weight: 700; }
+.answers dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .answers { grid-template-columns: minmax(0, 1fr); } .answers dd { margin-bottom: 6px; } }
+input[type=file] { max-width: 100%; min-height: 44px; }
