@@ -68,4 +68,12 @@ assert.equal(r.organizer, 'The Phoenix Catalyst');
 assert.equal(r.description, 'Free Gloves and bags provided All ages welcome');
 assert.equal(e.organizer, 'The Phoenix Catalyst');
 
-console.log('OCR parser: all 5 flyers, 2 misreads and a real screen photo parsed correctly');
+// Second AI-made flyer: pipes between details, "Presented by", short weekday and month
+const y = run([L('SUNRISE YOGA IN', 40), L('SYMPHONY WOODS', 40), L('Sun, Nov 22 | 8:30am-10am', 22), L('Symphony Woods Park, 10475 Little Patuxent Pkwy,', 11), L('Columbia, MD 21044', 11), L('$5 suggested donation | Bring a mat and water | Beginners welcome', 9), L('Presented by Howard County Yoga Collective', 10)]);
+assert.equal(y.title, 'Sunrise Yoga in Symphony Woods');
+assert.equal(y.start?.getDate(), 22); assert.equal(y.start?.getHours(), 8); assert.equal(y.start?.getMinutes(), 30); assert.equal(y.end?.getHours(), 10);
+assert.equal(y.location_name, 'Symphony Woods Park'); assert.equal(y.address, '10475 Little Patuxent Pkwy, Columbia, MD 21044');
+assert.equal(y.organizer, 'Howard County Yoga Collective'); assert.equal(y.cost, 'donation'); assert.equal(y.category, 'wellness');
+assert.equal(y.description, '$5 suggested donation · Bring a mat and water · Beginners welcome');
+
+console.log('OCR parser: all 6 flyers, 2 misreads and a real screen photo parsed correctly');

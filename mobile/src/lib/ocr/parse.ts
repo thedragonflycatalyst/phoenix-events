@@ -34,7 +34,10 @@ export function guessCategory(text: string, title = ''): PosterGuess['category']
 function tidy(s: string) {
   const t = s.replace(/\s+/g, ' ').replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9!?.)]+$/g, '').trim();
   // Posters shout; turn ALL CAPS into Title Case for readability
-  return t === t.toUpperCase() ? t.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()) : t;
+  if (t !== t.toUpperCase()) return t;
+  // Small words stay lowercase inside a title: "Sunrise Yoga in Symphony Woods"
+  return t.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase())
+    .replace(/(?!^)\b(A|An|And|At|By|For|In|Of|On|Or|The|To|With)\b/g, (w) => w.toLowerCase());
 }
 
 const MONTH_WORD = /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t(ember)?)?|oct(ober)?|nov(ember)?|dec(ember)?)\b/i;
@@ -164,7 +167,7 @@ function describe(lines: Line[], used: Set<Line>, isDateLine: (t: string) => boo
     if (isDateLine(t) || ADDRESS.test(t) || HOST.test(t) || PRESENTS.test(t) || /^[\d\s,.-]*[A-Za-z .]+,?\s*(MD|Maryland)\s*\d{5}$/i.test(t)) continue;
     const words = t.split(/\s+/).filter((w) => /[A-Za-z]{2,}/.test(w));
     if (words.length < 2 || (t.match(/[A-Za-z]/g) || []).length / t.length < 0.6) continue;
-    const clean = t.replace(/\s*[•·*]\s*/g, ' · ').replace(/^[^A-Za-z0-9"“($]+/, '');
+    const clean = t.replace(/\s*[•·*|]\s*/g, ' · ').replace(/^[^A-Za-z0-9"“($]+/, '');
     keep.push(clean === clean.toUpperCase() ? tidy(clean) : clean);
   }
   // Wrapped lines continue in lowercase; otherwise each line is its own sentence
