@@ -14,6 +14,7 @@ import { useApp } from '@/lib/app-state';
 import { fmtShort, fmtTime } from '@/lib/dates';
 import type { PosterGuess } from '@/lib/ocr/parse';
 import { looksLikeEvent, scanKey, setPendingScan, type Scan } from '@/lib/ocr/pending';
+import { withWebDetails } from '@/lib/ocr/enrich';
 import { readPoster, shrinkPhoto } from '@/lib/ocr/read';
 import type { PEvent } from '@/lib/model';
 import { addScanToPhoneCalendar, addToPhoneCalendar } from '@/lib/phone';
@@ -128,10 +129,13 @@ export default function ScanScreen() {
 
   const close = () => { if (found) forget(found.uri); if (router.canGoBack()) router.back(); else router.replace('/'); };
   const rescan = () => { if (found) forget(found.uri); setFound(null); setDupe(null); };
-  const post = (alsoPhone: boolean) => {
+  const post = async (alsoPhone: boolean) => {
     if (!found) return;
     if (!user) { router.push('/sign-in'); return; }
-    setPendingScan({ uri: found.uri, guess: found.guess, alsoPhone });
+    // Look up the event's own page for real details before filling the form
+    setManual(true);
+    const guess = await withWebDetails(found.guess).finally(() => setManual(false));
+    setPendingScan({ uri: found.uri, guess, alsoPhone });
     setFound(null);
     router.dismissTo('/add');
   };
@@ -223,11 +227,11 @@ export default function ScanScreen() {
                   <Button icon="add" title="Sign in to post it" onPress={() => post(false)} />
                 ) : found.sure ? (
                   <>
-                    <Button icon="add" title="Add to Phoenix + my phone calendar" onPress={() => post(true)} />
-                    <Button kind="ghost" icon="public" title="Phoenix calendar only" onPress={() => post(false)} />
+                    <Button icon="add" title="Add to Phoenix + my phone calendar" busy={manual} onPress={() => post(true)} />
+                    <Button kind="ghost" icon="public" title="Phoenix calendar only" busy={manual} onPress={() => post(false)} />
                   </>
                 ) : (
-                  <Button icon="add" title="Fill in the details" onPress={() => post(false)} />
+                  <Button icon="add" title="Fill in the details" busy={manual} onPress={() => post(false)} />
                 )}
                 {found.sure && <Button kind="ghost" icon={phoneDone ? 'check' : 'calendar_month'} busy={saved === 'busy'} disabled={phoneDone} title={phoneTitle} onPress={toPhone} />}
                 <Button kind="quiet" icon="document_scanner" title="Keep scanning" onPress={rescan} />

@@ -7,7 +7,7 @@ export async function readPoster(imageUri: string): Promise<PosterGuess> {
   // ML Kit groups text into blocks of lines; keep lines in reading order with their on-image height
   const lines = result.blocks
     .flatMap((b) => b.lines)
-    .map((l) => ({ text: l.text, height: Math.max(0, l.frame.bottom - l.frame.top), top: l.frame.top }))
+    .map((l) => ({ text: l.text, height: Math.max(0, l.frame.bottom - l.frame.top), top: l.frame.top, left: l.frame.left, width: Math.max(0, l.frame.right - l.frame.left) }))
     .sort((a, b) => a.top - b.top);
   const text = lines.map((l) => l.text).join('\n') || result.text;
   return parsePoster(text, lines);

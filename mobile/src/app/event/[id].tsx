@@ -1,9 +1,10 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Poster } from '@/components/events';
+import { CommentsPreview, SocialRail, useSocial } from '@/components/social';
 import { Button, Card, Empty, Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { fmtDay, fmtShort, whenText } from '@/lib/dates';
@@ -23,6 +24,10 @@ export default function EventScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [roster, setRoster] = useState<{ username: string | null; signed_up_at: string }[] | null>(null);
   const [inCal, setInCal] = useState(false);
+  const { social, reload: reloadSocial, toggleLike } = useSocial(id);
+  const [seen, setSeen] = useState(0);
+  // Coming back from the comments sheet refreshes the counts and preview
+  useFocusEffect(useCallback(() => { reloadSocial(); setSeen((n) => n + 1); }, [reloadSocial]));
 
   const load = useCallback(async () => {
     const { data } = await sb.from('phoenix_events').select('*').eq('id', id).maybeSingle();
@@ -78,6 +83,7 @@ export default function EventScreen() {
     } catch (err) { toast(errText(err), false); } finally { setBusy(null); }
   };
 
+  const openComments = () => router.push({ pathname: '/comments/[id]', params: { id: e.id } });
   const share = () => Share.share({ title: e.title, message: `${e.title} · ${fmtShort(e.starts_at)} ${e.all_day ? '' : whenText(e)}\n${shareUrl(e.id)}`, url: shareUrl(e.id) }).catch(() => {});
   const directions = () => {
     const q = encodeURIComponent(place);
@@ -104,7 +110,10 @@ export default function EventScreen() {
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <Stack.Screen options={{ headerTintColor: '#fff' }} />
       <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}>
-        <Poster e={e} size="hero" insetTop={insets.top + 44} style={{ borderRadius: 0, aspectRatio: e.poster_path ? 4 / 5 : 5 / 4, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }} />
+        <View>
+          <Poster e={e} size="hero" insetTop={insets.top + 44} style={{ borderRadius: 0, aspectRatio: e.poster_path ? 4 / 5 : 5 / 4, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }} />
+          {e.status === 'published' && <SocialRail social={social} onLike={toggleLike} onComments={openComments} onShare={share} />}
+        </View>
         <View style={{ padding: 16 }}>
           {e.status !== 'published' && <Card style={{ marginBottom: 12 }}><Txt v="bold" color={p.danger}>This event is {e.status} and only visible to you{app.isMod ? ' and moderators' : ''}.</Txt></Card>}
           <Txt v="kicker" color={c}>{CAT[e.category]?.emoji} {host}</Txt>
@@ -122,6 +131,7 @@ export default function EventScreen() {
           {e.description ? <><Txt v="h2" style={{ marginTop: 24, marginBottom: 8 }}>About</Txt><Txt>{e.description}</Txt></> : null}
           {e.url ? <Button kind="ghost" small icon="public" title="More info from the organizer" style={{ alignSelf: 'flex-start', marginTop: 14 }} onPress={() => WebBrowser.openBrowserAsync(e.url!)} /> : null}
           <Txt v="small" style={{ marginTop: 18 }}>Posted by @{e.created_by_username || 'neighbor'}{e.source === 'poster' ? ' from a flyer photo' : ''}. Details can change, so check with the organizer.</Txt>
+          {e.status === 'published' && <CommentsPreview eventId={e.id} count={social.comments} refreshKey={seen} />}
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
             {(mine || app.isMod) && <Button small kind="quiet" icon="edit" title="Edit" onPress={() => router.push({ pathname: '/edit/[id]', params: { id: e.id } })} />}

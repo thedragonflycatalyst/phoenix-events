@@ -15,7 +15,7 @@ adb shell am start -W -n "$PKG/.MainActivity"
 shot 01-explore 25
 adb shell input swipe 540 1900 540 700 500; shot 02-explore-scrolled 3
 adb shell input swipe 540 1900 540 500 500; shot 03-explore-calendar 3
-if [ -n "${EVENT_ID:-}" ]; then open "phoenix:///event/$EVENT_ID"; shot 04-event 10; fi
+if [ -n "${EVENT_ID:-}" ]; then open "phoenix:///event/$EVENT_ID"; shot 04-event 10; open "phoenix:///comments/$EVENT_ID"; shot 04b-comments 8; adb shell input keyevent KEYCODE_BACK; sleep 2; fi
 open "phoenix:///map";     shot 05-map 15
 open "phoenix:///add";     shot 06-add 6
 open "phoenix:///mine";    shot 07-mine 6

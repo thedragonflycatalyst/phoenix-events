@@ -63,7 +63,13 @@ export function EventForm({ initial, existing, poster, header, note, phoneDefaul
   const p = usePalette();
   const toast = useToast();
   const app = useApp();
-  const [d, setD] = useState<Draft>({ category: 'community', cost: 'free', tags: [], all_day: false, ...initial });
+  // Only Phoenix leaders can mark a flyer's "Hosted by The Phoenix Catalyst"; for leaders it turns on the official switch
+  const claimsTpc = !existing && /phoenix\s*catalyst/i.test(initial.organizer ?? '');
+  const [d, setD] = useState<Draft>(() => ({
+    category: 'community', cost: 'free', tags: [], all_day: false, ...initial,
+    ...(claimsTpc ? (app.canTpc ? { is_tpc: true } : { organizer: '' }) : {}),
+  }));
+  const tpcNote = claimsTpc && !app.canTpc ? 'This flyer says it’s hosted by The Phoenix Catalyst. Only Phoenix leaders can post official Phoenix events, so the host was left blank.' : '';
   const [busy, setBusy] = useState(false);
   const [alsoPhone, setAlsoPhone] = useState(phoneDefault);
   const set = (patch: Draft) => setD((x) => ({ ...x, ...patch }));
@@ -140,6 +146,7 @@ export function EventForm({ initial, existing, poster, header, note, phoneDefaul
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 60 }} style={{ backgroundColor: p.bg }}>
       {header}
       {note ? <Card style={{ marginBottom: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }}><Txt style={{ fontSize: 22 }}>✨</Txt><Txt v="bold" style={{ flex: 1 }}>{note}</Txt></Card> : null}
+      {tpcNote ? <Card style={{ marginBottom: 14, flexDirection: 'row', gap: 10, alignItems: 'center' }}><Icon name="shield_person" color={p.muted} /><Txt v="small" style={{ flex: 1 }}>{tpcNote}</Txt></Card> : null}
       {poster && <Image source={{ uri: poster }} style={{ width: '100%', aspectRatio: 4 / 5, borderRadius: R.lg, marginBottom: 16 }} contentFit="cover" accessibilityLabel="Your flyer photo" />}
       <Card style={{ marginBottom: 14 }}>
         <Field label="Event name" value={d.title ?? ''} onChangeText={(t) => set({ title: t })} maxLength={140} />

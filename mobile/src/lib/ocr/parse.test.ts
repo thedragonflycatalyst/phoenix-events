@@ -43,4 +43,29 @@ assert.equal(f.dateSure, false);
 const g2 = run([L('FALL CLEANUP', 70), L('Saturday', 30), L('9 AM – 12 PM', 30)]);
 assert.equal(g2.dateSure, false);
 
-console.log('OCR parser: all 5 flyers and 2 misreads parsed correctly');
+// Real phone photo of the flyer on a laptop screen (ML Kit lines with positions), including the browser and ChatGPT around it
+const P = (text: string, height: number, top: number, left: number, width: number) => ({ text, height, top, left, width });
+const realLines = [
+  P('Phoenix Community C X', 9, 217, 75, 115), P('URL Configuration | AL X', 9, 219, 225, 120), P(') Create Cleanup Flyer X t', 9, 222, 358, 140),
+  P('chatgpt.com/c/6ae73d45-6fa4-83ea-981d-c390abOe0add', 9, 258, 308, 270), P('ChatGPT', 10, 284, 60, 50), P('t Share', 9, 296, 707, 42), P('...', 4, 298, 673, 12),
+  P('New chat', 8, 322, 62, 58), P('LAKE KITTAMAQUNDI', 26, 342, 333, 245), P('O Scheduled', 8, 350, 62, 62), P('UD Library', 8, 375, 64, 48),
+  P('FALL CLEANUP', 32, 375, 345, 220), P('@ Plugins', 8, 400, 66, 50), P('** Explore', 8, 425, 68, 50),
+  P('Saturday, November 14 ·9 AM - 12 PM', 14, 436, 333, 242), P('O Lakefront Plaza, 10275 Wincopin', 10, 462, 343, 200), P('Circle,', 10, 466, 525, 38),
+  P('Pinned', 8, 464, 69, 32), P('Columbia, MD 21044', 10, 476, 405, 105), P('All Projects', 8, 491, 88, 48),
+  P('Free Gloves and bags provided All', 9, 497, 336, 190), P('ages welcome', 9, 499, 505, 65), P('Person Training Planning', 8, 517, 89, 105),
+  P('Hosted by The Phoenix Catalyst', 11, 518, 367, 170), P('5 Preworkout', 8, 541, 80, 60), P('Projects', 8, 579, 77, 34), P('B 60 day cut', 8, 605, 80, 58),
+  P('B Art work generation.', 8, 630, 80, 100), P('Edit', 8, 634, 335, 20), P('aMRLETES', 8, 655, 510, 50), P('+ Ask ChatGPT', 9, 663, 330, 82),
+  P('The Dragonfly Catalyst', 9, 665, 100, 95), P('Medium', 8, 669, 620, 38), P('8.24 AM', 6, 712, 712, 30), P('11/1/2026', 6, 720, 710, 34),
+  P('DELETE', 7, 853, 715, 48), P('ENTER', 8, 1012, 722, 60),
+];
+const r = parsePoster(realLines.map((l) => l.text).join('\n'), realLines, new Date(2026, 10, 1, 8, 27));
+assert.equal(r.title, 'Lake Kittamaqundi Fall Cleanup');
+assert.equal(r.start?.toDateString(), new Date(2026, 10, 14).toDateString());
+assert.equal(r.start?.getHours(), 9); assert.equal(r.end?.getHours(), 12); assert.equal(r.dateSure, true);
+assert.equal(r.location_name, 'Lakefront Plaza');
+assert.equal(r.address, '10275 Wincopin Circle, Columbia, MD 21044');
+assert.equal(r.organizer, 'The Phoenix Catalyst');
+assert.equal(r.description, 'Free Gloves and bags provided All ages welcome');
+assert.equal(e.organizer, 'The Phoenix Catalyst');
+
+console.log('OCR parser: all 5 flyers, 2 misreads and a real screen photo parsed correctly');

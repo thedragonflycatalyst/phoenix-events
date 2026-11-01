@@ -9,15 +9,17 @@ import { Button, Card, Empty, Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import type { PosterGuess } from '@/lib/ocr/parse';
 import { takePendingScan } from '@/lib/ocr/pending';
+import { withWebDetails } from '@/lib/ocr/enrich';
 import { readPoster, shrinkPhoto } from '@/lib/ocr/read';
 import { F, POSTER, R, usePalette } from '@/lib/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
-const toDraft = (g: PosterGuess): Draft => ({ title: g.title, category: g.category, start: g.start, end: g.end, all_day: g.allDay, location_name: g.location_name, address: g.address, url: g.url, cost: g.cost, description: g.description });
-const foundText = (g: PosterGuess) => {
+const toDraft = (g: PosterGuess): Draft => ({ title: g.title, category: g.category, start: g.start, end: g.end, all_day: g.allDay, location_name: g.location_name, address: g.address, url: g.url, cost: g.cost, description: g.description, organizer: g.organizer });
+const foundText = (g: PosterGuess & { detailsFrom?: string }) => {
   const got = [g.title && 'name', g.start && 'date', (g.location_name || g.address) && 'place'].filter(Boolean) as string[];
   const base = got.length ? `Found the ${got.join(', ')}. Check everything below.` : 'We couldn’t read much from this one. Fill in the details below.';
-  return g.start && !g.dateSure ? `${base} The date may be misread, so check it against the flyer.` : base;
+  const web = g.detailsFrom ? ` Details came from ${g.detailsFrom}.` : '';
+  return (g.start && !g.dateSure ? `${base} The date may be misread, so check it against the flyer.` : base) + web;
 };
 
 type Mode = { kind: 'choose' } | { kind: 'reading'; uri: string } | { kind: 'form'; draft: Draft; poster?: string; found?: string; alsoPhone?: boolean };
@@ -59,7 +61,7 @@ export default function Add() {
     const small = await shrinkPhoto(a.uri, a.width, a.height);
     setMode({ kind: 'reading', uri: small });
     try {
-      const g = await readPoster(small);
+      const g = await withWebDetails(await readPoster(small));
       setMode({ kind: 'form', poster: small, found: foundText(g), draft: toDraft(g) });
     } catch {
       setMode({ kind: 'form', poster: small, found: 'We couldn’t read this photo. Fill in the details below.', draft: {} });
