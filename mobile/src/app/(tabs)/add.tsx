@@ -16,10 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 const toDraft = (g: PosterGuess): Draft => ({ title: g.title, category: g.category, start: g.start, end: g.end, all_day: g.allDay, location_name: g.location_name, address: g.address, url: g.url, cost: g.cost, description: g.description });
 const foundText = (g: PosterGuess) => {
   const got = [g.title && 'name', g.start && 'date', (g.location_name || g.address) && 'place'].filter(Boolean) as string[];
-  return got.length ? `Found the ${got.join(', ')}. Check everything below.` : 'We couldn’t read much from this one. Fill in the details below.';
+  const base = got.length ? `Found the ${got.join(', ')}. Check everything below.` : 'We couldn’t read much from this one. Fill in the details below.';
+  return g.start && !g.dateSure ? `${base} The date may be misread, so check it against the flyer.` : base;
 };
 
-type Mode = { kind: 'choose' } | { kind: 'reading'; uri: string } | { kind: 'form'; draft: Draft; poster?: string; found?: string };
+type Mode = { kind: 'choose' } | { kind: 'reading'; uri: string } | { kind: 'form'; draft: Draft; poster?: string; found?: string; alsoPhone?: boolean };
 
 export default function Add() {
   const p = usePalette();
@@ -31,7 +32,7 @@ export default function Add() {
   // A flyer confirmed in the live scanner arrives here already read
   useFocusEffect(useCallback(() => {
     const scan = takePendingScan();
-    if (scan) { setMode({ kind: 'form', poster: scan.uri, found: foundText(scan.guess), draft: toDraft(scan.guess) }); setFormKey((k) => k + 1); }
+    if (scan) { setMode({ kind: 'form', poster: scan.uri, found: foundText(scan.guess), draft: toDraft(scan.guess), alsoPhone: scan.alsoPhone }); setFormKey((k) => k + 1); }
   }, []));
 
   if (!user) {
@@ -78,7 +79,7 @@ export default function Add() {
   if (mode.kind === 'form') {
     return (
       <View style={{ flex: 1, backgroundColor: p.bg, paddingTop: insets.top }}>
-        <EventForm key={formKey} initial={mode.draft} poster={mode.poster}
+        <EventForm key={formKey} initial={mode.draft} poster={mode.poster} phoneDefault={!!mode.alsoPhone}
           header={(
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <Txt v="h1">New event</Txt>

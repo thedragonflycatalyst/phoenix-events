@@ -13,9 +13,11 @@ import { Button, Icon } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { fmtShort, fmtTime } from '@/lib/dates';
 import type { PosterGuess } from '@/lib/ocr/parse';
-import { looksLikeEvent, setPendingScan, type Scan } from '@/lib/ocr/pending';
+import { looksLikeEvent, scanKey, setPendingScan, type Scan } from '@/lib/ocr/pending';
 import { readPoster, shrinkPhoto } from '@/lib/ocr/read';
-import { addScanToPhoneCalendar } from '@/lib/phone';
+import type { PEvent } from '@/lib/model';
+import { addScanToPhoneCalendar, addToPhoneCalendar } from '@/lib/phone';
+import { sb } from '@/lib/supabase';
 import { F, R, usePalette } from '@/lib/theme';
 
 const GAP_MS = 600; // pause between reads so the phone stays cool
@@ -41,8 +43,23 @@ export default function ScanScreen() {
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
   const [found, setFound] = useState<(Scan & { sure: boolean }) | null>(null);
   const [manual, setManual] = useState(false);
-  const [saved, setSaved] = useState<'idle' | 'busy' | 'added' | 'denied' | 'no-calendar'>('idle');
+  const [saved, setSaved] = useState<'idle' | 'busy' | 'added' | 'already' | 'denied' | 'no-calendar'>('idle');
+  const [dupe, setDupe] = useState<PEvent | null>(null);
   const busy = useRef(false);
+  const lastRead = useRef<Scan | null>(null);
+
+  /** Shows the "looks like an event" sheet, first checking whether it's already on the Phoenix calendar. */
+  const present = async (scan: Scan, sure: boolean) => {
+    setSaved('idle'); setDupe(null);
+    setFound({ ...scan, sure });
+    const g = scan.guess;
+    if (!g.start) return;
+    const { data } = await sb.rpc('phoenix_find_duplicates', { p_title: g.title, p_starts_at: g.start.toISOString(), p_address: g.address || null });
+    const id = (data as { id: string }[] | null)?.[0]?.id;
+    if (!id) return;
+    const { data: ev } = await sb.from('phoenix_events').select('*').eq('id', id).maybeSingle();
+    if (ev) setDupe(ev as PEvent);
+  };
 
   useEffect(() => { const s = AppState.addEventListener('change', (st) => setAppActive(st === 'active')); return () => s.remove(); }, []);
   useEffect(() => { if (perm && !perm.granted && perm.canAskAgain) requestPerm(); }, [perm, requestPerm]);
@@ -70,14 +87,21 @@ export default function ScanScreen() {
         try {
           const scan = await grab();
           if (!scan) continue;
-          if (!stop && looksLikeEvent(scan.guess)) {
+          const prev = lastRead.current;
+          if (!stop && looksLikeEvent(scan.guess) && prev && scanKey(prev.guess) === scanKey(scan.guess)) {
+            // Two reads in a row agree on the name and time, so a blurry frame can't pick the wrong date
+            forget(prev.uri); lastRead.current = null;
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-            setSaved('idle'); setFound({ ...scan, sure: true }); stop = true;
-          } else forget(scan.uri);
+            stop = true; void present(scan, true);
+          } else {
+            if (prev) forget(prev.uri);
+            lastRead.current = looksLikeEvent(scan.guess) ? scan : null;
+            if (!lastRead.current) forget(scan.uri);
+          }
         } catch { /* camera busy or closing; try the next frame */ } finally { busy.current = false; }
       }
     })();
-    return () => { stop = true; };
+    return () => { stop = true; if (lastRead.current) { forget(lastRead.current.uri); lastRead.current = null; } };
   }, [live, ready]);
 
   // Shutter: read this exact photo even if it doesn't look like an event
@@ -86,7 +110,7 @@ export default function ScanScreen() {
     busy.current = true; setManual(true);
     try {
       const scan = await grab();
-      if (scan) { setSaved('idle'); setFound({ ...scan, sure: looksLikeEvent(scan.guess) }); }
+      if (scan) void present(scan, looksLikeEvent(scan.guess));
     } finally { busy.current = false; setManual(false); }
   };
 
@@ -98,16 +122,16 @@ export default function ScanScreen() {
     try {
       const small = await shrinkPhoto(a.uri, a.width, a.height);
       const guess = await readPoster(small).catch(() => null);
-      if (guess) { setSaved('idle'); setFound({ uri: small, guess, sure: looksLikeEvent(guess) }); }
+      if (guess) void present({ uri: small, guess }, looksLikeEvent(guess));
     } finally { setManual(false); }
   };
 
   const close = () => { if (found) forget(found.uri); if (router.canGoBack()) router.back(); else router.replace('/'); };
-  const rescan = () => { if (found) forget(found.uri); setFound(null); };
-  const post = () => {
+  const rescan = () => { if (found) forget(found.uri); setFound(null); setDupe(null); };
+  const post = (alsoPhone: boolean) => {
     if (!found) return;
     if (!user) { router.push('/sign-in'); return; }
-    setPendingScan({ uri: found.uri, guess: found.guess });
+    setPendingScan({ uri: found.uri, guess: found.guess, alsoPhone });
     setFound(null);
     router.dismissTo('/add');
   };
@@ -115,13 +139,16 @@ export default function ScanScreen() {
     if (!found?.guess.start) return;
     setSaved('busy');
     const g = found.guess;
-    const r = await addScanToPhoneCalendar({
+    const r = dupe ? await addToPhoneCalendar(dupe).catch(() => 'no-calendar' as const) : await addScanToPhoneCalendar({
       title: g.title, start: g.start as Date, end: g.end, allDay: g.allDay,
       place: [g.location_name, g.address].filter(Boolean).join(', '), notes: [g.description, g.url].filter(Boolean).join('\n\n'),
     }).catch(() => 'no-calendar' as const);
     setSaved(r);
-    if (r === 'added') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    if (r === 'added' || r === 'already') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   };
+
+  const phoneDone = saved === 'added' || saved === 'already';
+  const phoneTitle = { idle: 'My phone calendar only', busy: 'Adding…', added: 'Added to your phone calendar', already: 'Already in your phone calendar', denied: 'Allow calendar access in Settings', 'no-calendar': 'No phone calendar found' }[saved];
 
   if (!perm) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   if (!perm.granted) {
@@ -173,22 +200,40 @@ export default function ScanScreen() {
           <View style={[st.row, { gap: 14, alignItems: 'flex-start' }]}>
             <Image source={{ uri: found.uri }} style={{ width: 76, height: 96, borderRadius: R.md }} contentFit="cover" accessibilityLabel="The flyer" />
             <View style={{ flex: 1, gap: 3 }}>
-              <Text style={[st.kicker, { color: found.sure ? p.good : p.muted }]}>{found.sure ? 'LOOKS LIKE AN EVENT' : 'COULDN’T FIND A DATE'}</Text>
+              <Text style={[st.kicker, { color: found.sure ? p.good : p.muted }]}>{dupe ? 'ALREADY ON PHOENIX' : found.sure ? 'LOOKS LIKE AN EVENT' : found.guess.start ? 'CHECK THE DATE' : 'COULDN’T FIND A DATE'}</Text>
               <Text style={[st.h, { color: p.ink }]} numberOfLines={2}>{found.guess.title || 'Untitled event'}</Text>
               {!!found.guess.start && <Text style={[st.body, { color: p.ink }]}>{whenOf(found.guess)}</Text>}
               {!!(found.guess.location_name || found.guess.address) && <Text style={[st.body, { color: p.muted }]} numberOfLines={2}>{[found.guess.location_name, found.guess.address].filter(Boolean).join(', ')}</Text>}
             </View>
           </View>
-          <Text style={[st.body, { color: p.ink, marginTop: 16, fontFamily: F.bodyBold }]}>{found.sure ? 'Add it to the calendar?' : 'Want to fill in the details yourself?'}</Text>
-          <View style={{ gap: 10, marginTop: 12 }}>
-            <Button icon="add" title={user ? (found.sure ? 'Add to Phoenix calendar' : 'Fill in the details') : 'Sign in to post it'} onPress={post} />
-            {found.sure && (
-              <Button kind="ghost" icon={saved === 'added' ? 'check' : 'calendar_month'} busy={saved === 'busy'} disabled={saved === 'added'}
-                title={{ idle: 'Just add it to my phone calendar', busy: 'Adding…', added: 'Added to your phone calendar', denied: 'Allow calendar access in Settings', 'no-calendar': 'No phone calendar found' }[saved]}
-                onPress={toPhone} />
-            )}
-            <Button kind="quiet" icon="document_scanner" title="Keep scanning" onPress={rescan} />
-          </View>
+          {dupe ? (
+            <>
+              <Text style={[st.body, { color: p.ink, marginTop: 16, fontFamily: F.bodyBold }]}>This event is already on the Phoenix calendar.</Text>
+              <View style={{ gap: 10, marginTop: 12 }}>
+                <Button icon="event_available" title="Open it" onPress={() => { const id = dupe.id; rescan(); router.push({ pathname: '/event/[id]', params: { id } }); }} />
+                <Button kind="ghost" icon={phoneDone ? 'check' : 'calendar_month'} busy={saved === 'busy'} disabled={phoneDone} title={phoneTitle} onPress={toPhone} />
+                <Button kind="quiet" icon="document_scanner" title="Keep scanning" onPress={rescan} />
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[st.body, { color: p.ink, marginTop: 16, fontFamily: F.bodyBold }]}>{found.sure ? 'Add it to the calendar?' : 'Want to fill in the details yourself?'}</Text>
+              <View style={{ gap: 10, marginTop: 12 }}>
+                {!user ? (
+                  <Button icon="add" title="Sign in to post it" onPress={() => post(false)} />
+                ) : found.sure ? (
+                  <>
+                    <Button icon="add" title="Add to Phoenix + my phone calendar" onPress={() => post(true)} />
+                    <Button kind="ghost" icon="public" title="Phoenix calendar only" onPress={() => post(false)} />
+                  </>
+                ) : (
+                  <Button icon="add" title="Fill in the details" onPress={() => post(false)} />
+                )}
+                {found.sure && <Button kind="ghost" icon={phoneDone ? 'check' : 'calendar_month'} busy={saved === 'busy'} disabled={phoneDone} title={phoneTitle} onPress={toPhone} />}
+                <Button kind="quiet" icon="document_scanner" title="Keep scanning" onPress={rescan} />
+              </View>
+            </>
+          )}
         </View>
       )}
     </View>

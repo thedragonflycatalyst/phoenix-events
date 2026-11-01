@@ -28,4 +28,19 @@ assert.equal(c.location_name, 'Bengies Drive-In'); assert.equal(c.cost, 'paid');
 const d = run([L('Spring Food Drive', 70), L('Saturday, April 11', 40), L('All day', 30), L('Oakland Mills Village Center', 30)]);
 assert.equal(d.title, 'Spring Food Drive'); assert.equal(d.allDay, true); assert.equal(d.category, 'community');
 
-console.log('OCR parser: all 4 flyers parsed correctly');
+// AI-made test flyer: venue and address on one line, city and ZIP wrapped to the next
+const e = run([L('LAKE KITTAMAQUNDI', 60), L('FALL CLEANUP', 70), L('Saturday, November 14 • 9 AM – 12 PM', 30), L('Lakefront Plaza, 10275 Wincopin Circle,', 22), L('Columbia, MD 21044', 22), L('Free • Gloves and bags provided • All ages welcome', 20), L('Hosted by The Phoenix Catalyst', 20), L('SAMPLE TEST FLYER', 8)]);
+assert.equal(e.title, 'Lake Kittamaqundi Fall Cleanup');
+assert.equal(e.start?.getDate(), 14); assert.equal(e.start?.getHours(), 9); assert.equal(e.end?.getHours(), 12);
+assert.equal(e.location_name, 'Lakefront Plaza');
+assert.equal(e.address, '10275 Wincopin Circle, Columbia, MD 21044');
+assert.equal(e.cost, 'free'); assert.equal(e.category, 'environmental');
+
+assert.equal(e.dateSure, true);
+// A frame that loses the "14" must not be trusted: Saturday doesn't match the date read
+const f = run([L('FALL CLEANUP', 70), L('Saturday, November 9 AM – 12 PM', 30)]);
+assert.equal(f.dateSure, false);
+const g2 = run([L('FALL CLEANUP', 70), L('Saturday', 30), L('9 AM – 12 PM', 30)]);
+assert.equal(g2.dateSure, false);
+
+console.log('OCR parser: all 5 flyers and 2 misreads parsed correctly');

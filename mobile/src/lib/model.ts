@@ -38,6 +38,7 @@ export const HOME = { lat: 39.2037, lng: -76.861, name: 'Columbia, MD' };
 export const DONATE_LINKS: Record<string, string> = { '10': '', '25': '', '50': '', '100': '', custom: '' };
 
 const FRIENDLY: Record<string, string> = {
+  duplicate_event: 'This event is already on the calendar. Open it from Explore instead of posting it again.',
   phoenix_rate_limited: 'You’ve added 20 events today. You can add more tomorrow.',
   phoenix_event_unavailable: 'This event is no longer available.',
   phoenix_volunteer_full: 'All volunteer spots are filled. You can still say you’re going.',

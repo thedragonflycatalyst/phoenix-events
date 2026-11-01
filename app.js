@@ -59,6 +59,7 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3600);
 }
 const FRIENDLY = {
+  duplicate_event: 'This event is already on the calendar. Search for it instead of posting it again.',
   phoenix_rate_limited: 'You’ve added 20 events today. You can add more tomorrow.',
   phoenix_event_unavailable: 'This event is no longer available.',
   phoenix_volunteer_full: 'All volunteer spots are filled. You can still mark yourself as going.',

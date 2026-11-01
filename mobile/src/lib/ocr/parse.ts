@@ -5,10 +5,12 @@ export type OcrLine = { text: string; height: number };
 export type PosterGuess = {
   title: string; start: Date | null; end: Date | null; allDay: boolean;
   location_name: string; address: string; url: string;
+  /** False when the date is a guess: no month and day, or the weekday on the flyer doesn't match the date read. */
+  dateSure: boolean;
   cost: 'free' | 'paid' | 'donation'; category: 'environmental' | 'community' | 'wellness' | 'mental' | 'arts' | 'other'; description: string;
 };
 
-const ADDRESS = /\b\d{1,6}\s+(?:(?:Route|Rte|Highway|Hwy|US|MD)[ -]?\d{1,4}|[A-Za-z0-9.' -]{2,40}?\s(?:Road|Rd|Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Parkway|Pkwy|Place|Pl|Circle|Cir|Pike|Highway|Hwy|Route|Rte|Terrace|Ter))\b\.?(?:[ ,]+[A-Za-z .]+,?\s*(?:MD|Maryland)?\s*\d{5})?/i;
+const ADDRESS = /\b\d{1,6}\s+(?:(?:Route|Rte|Highway|Hwy|US|MD)[ -]?\d{1,4}|[A-Za-z0-9.' -]{2,40}?\s(?:Road|Rd|Street|St|Avenue|Ave|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Parkway|Pkwy|Place|Pl|Circle|Cir|Pike|Highway|Hwy|Route|Rte|Terrace|Ter))\b\.?(?:[ ,]*\n?[ ,]*[A-Za-z .]+,?\s*(?:MD|Maryland)?\s*\d{5})?/i;
 const VENUE = /\b(park|center|centre|library|church|school|hall|lake|trail|pavilion|plaza|mall|drive-?in|theater|theatre|garden|field|farm|museum|village|pool|gym|cafe|brewery)\b/i;
 const CATEGORY_WORDS: [PosterGuess['category'], RegExp][] = [
   ['arts', /\b(haunted|halloween|festival|concert|movie|film|double feature|drive-?in|theater|theatre|dance|poetry|craft|paint(ing)?|art show|music|holiday lights?|parade|trivia)\b/gi],
@@ -39,7 +41,7 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
   const lines = rawLines.map((l) => ({ text: l.text.trim(), h: l.height }))
     .filter((l) => (l.text.match(/[A-Za-z]/g) || []).length >= 3);
 
-  const found: PosterGuess = { title: '', start: null, end: null, allDay: false, location_name: '', address: '', url: '', cost: 'free', category: 'community', description: '' };
+  const found: PosterGuess = { title: '', start: null, end: null, allDay: false, dateSure: false, location_name: '', address: '', url: '', cost: 'free', category: 'community', description: '' };
 
   // "Nov 14 · 9:30am" often reads as "Nov 14 - 9:30am", which looks like a range; treat the separator as "at"
   const dateish = text.replace(/((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?)\s+[-–—·•|@]\s+(?=\d{1,2}(?::\d{2})?\s*[ap]\.?m)/gi, '$1 at ');
@@ -62,6 +64,9 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
     }
     if (end && end < start) end.setDate(end.getDate() + 1);
     found.start = start; found.end = end;
+    // "Saturday, November 9" when the flyer says Saturday the 14th means part of the date was misread
+    const weekdayOk = !dated.start.isCertain('weekday') || dated.start.get('weekday') === start.getDay();
+    found.dateSure = dated.start.isCertain('month') && dated.start.isCertain('day') && weekdayOk;
   }
 
   // Title: the largest text on the poster that isn't the date
@@ -81,9 +86,14 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
   }
 
   const addr = text.match(ADDRESS);
-  if (addr) found.address = tidy(addr[0]);
+  if (addr) found.address = tidy(addr[0].replace(/\s*\n\s*/g, ' '));
   const venue = lines.find((l) => !used.has(l) && VENUE.test(l.text) && !ADDRESS.test(l.text) && !isDateLine(l.text));
   if (venue) found.location_name = tidy(venue.text).replace(/^(at|@|location:?|where:?)\s+/i, '').slice(0, 200);
+  // "Lakefront Plaza, 10275 Wincopin Circle": the venue sits before the address on the same line
+  if (!found.location_name && addr) {
+    const before = (lines.find((l) => l.text.includes(addr[0].split('\n')[0].trim()))?.text ?? '').split(/\b\d{1,6}\s/)[0].replace(/[,\s]+$/, '');
+    if (before && VENUE.test(before)) found.location_name = tidy(before);
+  }
 
   const url = text.match(/\b(?:https?:\/\/|www\.)[^\s]+/i);
   if (url) found.url = (url[0].startsWith('http') ? url[0] : `https://${url[0]}`).replace(/[.,;)]+$/, '');

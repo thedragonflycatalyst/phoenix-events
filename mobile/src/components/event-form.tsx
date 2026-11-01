@@ -4,11 +4,13 @@ import { Image } from 'expo-image';
 import * as Crypto from 'expo-crypto';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useApp } from '@/lib/app-state';
 import { addDays, dayKey } from '@/lib/dates';
 import { geocode } from '@/lib/geo';
 import { CATS, COSTS, errText, TAGS, type PEvent } from '@/lib/model';
+import { addToPhoneCalendar } from '@/lib/phone';
+import { fmtShort, fmtTime } from '@/lib/dates';
 import { sb } from '@/lib/supabase';
 import { F, R, usePalette } from '@/lib/theme';
 import { Button, Card, Chip, Field, Icon, Txt, useToast } from './ui';
@@ -40,12 +42,30 @@ function DateTimeField({ label, value, mode, onChange, optional }: { label: stri
 }
 
 /** Shared add/edit form. `poster` is a local photo to upload when posting. */
-export function EventForm({ initial, existing, poster, header, note }: { initial: Draft; existing?: PEvent; poster?: string; header?: React.ReactNode; note?: string }) {
+type Dupe = { id: string; title: string; starts_at: string; location_name: string | null };
+
+/** Asks whether a similar event already on the calendar is the same one. Resolves 'post' to carry on. */
+function confirmNotDuplicate(dupe: Dupe): Promise<'post' | 'open' | 'cancel'> {
+  const when = `${fmtShort(dupe.starts_at)} at ${fmtTime(dupe.starts_at)}`;
+  return new Promise((resolve) => Alert.alert(
+    'Already on the calendar?',
+    `“${dupe.title}” on ${when}${dupe.location_name ? ` at ${dupe.location_name}` : ''} looks like the same event.`,
+    [
+      { text: 'Cancel', style: 'cancel', onPress: () => resolve('cancel') },
+      { text: 'Open it', onPress: () => resolve('open') },
+      { text: 'It’s different, post', onPress: () => resolve('post') },
+    ],
+    { cancelable: true, onDismiss: () => resolve('cancel') },
+  ));
+}
+
+export function EventForm({ initial, existing, poster, header, note, phoneDefault = false }: { initial: Draft; existing?: PEvent; poster?: string; header?: React.ReactNode; note?: string; phoneDefault?: boolean }) {
   const p = usePalette();
   const toast = useToast();
   const app = useApp();
   const [d, setD] = useState<Draft>({ category: 'community', cost: 'free', tags: [], all_day: false, ...initial });
   const [busy, setBusy] = useState(false);
+  const [alsoPhone, setAlsoPhone] = useState(phoneDefault);
   const set = (patch: Draft) => setD((x) => ({ ...x, ...patch }));
 
   // Date and times are edited separately but stored as one start/end
@@ -71,6 +91,16 @@ export function EventForm({ initial, existing, poster, header, note }: { initial
     if (app.canTpc) { row.is_tpc = !!d.is_tpc; row.volunteer_slots = d.volunteer_slots || null; }
     setBusy(true);
     try {
+      // Safeguard: check for the same event before uploading anything
+      if (!existing) {
+        const { data: dupes } = await sb.rpc('phoenix_find_duplicates', { p_title: title, p_starts_at: row.starts_at, p_address: row.address });
+        const dupe = (dupes as Dupe[] | null)?.[0];
+        if (dupe) {
+          const choice = await confirmNotDuplicate(dupe);
+          if (choice === 'open') { router.push({ pathname: '/event/[id]', params: { id: dupe.id } }); return; }
+          if (choice === 'cancel') return;
+        }
+      }
       const where = (row.address || row.location_name) as string | null;
       const placeChanged = !existing || existing.address !== row.address || existing.location_name !== row.location_name;
       let unplaced = false;
@@ -94,8 +124,13 @@ export function EventForm({ initial, existing, poster, header, note }: { initial
         if (error) { if (row.poster_path) await sb.storage.from('phoenix-posters').remove([row.poster_path as string]); throw error; }
         id = data.id;
       }
+      let phoneNote = '';
+      if (!existing && alsoPhone && id) {
+        const r = await addToPhoneCalendar({ ...(row as unknown as PEvent), id }).catch(() => 'no-calendar' as const);
+        phoneNote = r === 'added' || r === 'already' ? ' Added to your phone calendar too.' : r === 'denied' ? ' Allow calendar access to add it to your phone.' : '';
+      }
       app.bump();
-      toast(unplaced ? `${existing ? 'Saved' : 'Posted'}. We couldn’t find that place on the map.` : existing ? 'Saved' : 'Posted! Thanks for sharing. 🔥');
+      toast((unplaced ? `${existing ? 'Saved' : 'Posted'}. We couldn’t find that place on the map.` : existing ? 'Saved' : 'Posted! Thanks for sharing. 🔥') + phoneNote);
       if (existing) router.back(); else router.replace({ pathname: '/event/[id]', params: { id: id! } });
     } catch (err) { toast(errText(err), false); } finally { setBusy(false); }
   };
@@ -154,6 +189,15 @@ export function EventForm({ initial, existing, poster, header, note }: { initial
           </View>
           {d.is_tpc && <View style={{ marginTop: 14 }}><Field label="Volunteer spots" hint="(blank for unlimited)" keyboardType="number-pad" value={d.volunteer_slots ? String(d.volunteer_slots) : ''}
             onChangeText={(t) => set({ volunteer_slots: t ? Math.max(1, Math.min(1000, Number(t.replace(/\D/g, '')) || 1)) : null })} /></View>}
+        </Card>
+      )}
+      {!existing && (
+        <Card style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Txt v="bold">Also add to my phone calendar</Txt>
+            <Txt v="small">With a reminder an hour before.</Txt>
+          </View>
+          <Switch value={alsoPhone} onValueChange={setAlsoPhone} trackColor={{ true: p.focus, false: p.line }} thumbColor="#fff" accessibilityLabel="Also add to my phone calendar" />
         </Card>
       )}
       <Button title={existing ? 'Save changes' : 'Post event'} busy={busy} onPress={save} />
