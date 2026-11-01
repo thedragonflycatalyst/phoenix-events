@@ -4,7 +4,8 @@ import { ActivityIndicator, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, Empty, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
-import { KINDS, pendingApplications, reviewApplication, type Application } from '@/lib/applications';
+import * as WebBrowser from 'expo-web-browser';
+import { KINDS, pendingApplications, resumeLink, reviewApplication, type Application, type Resume } from '@/lib/applications';
 import { errText } from '@/lib/model';
 import { F, R, usePalette } from '@/lib/theme';
 
@@ -47,10 +48,14 @@ export default function ApplicationsScreen() {
           <Txt v="h2" style={{ marginTop: 2 }}>@{a.username ?? 'neighbor'}</Txt>
           <Txt v="small">Applied {new Date(a.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Txt>
           <View style={{ marginTop: 10, gap: 6 }}>
-            {Object.entries(a.answers).filter(([k, v]) => k !== 'agreed' && v !== null && v !== '' && !(Array.isArray(v) && !v.length)).map(([k, v]) => (
+            {Object.entries(a.answers).filter(([k, v]) => k !== 'agreed' && k !== 'resume' && v !== null && v !== '' && !(Array.isArray(v) && !v.length)).map(([k, v]) => (
               <Txt key={k} style={{ fontSize: 15 }}><Txt v="bold" style={{ fontSize: 15 }}>{LABELS[k] ?? k}: </Txt>{show(v)}</Txt>
             ))}
             {a.answers.agreed ? <Txt v="small">✓ Agreed to the guidelines</Txt> : null}
+            {a.answers.resume ? (
+              <Button small kind="ghost" icon="edit_note" title={`Open resume · ${(a.answers.resume as Resume).name}`} style={{ alignSelf: 'flex-start', marginTop: 4 }}
+                onPress={() => { resumeLink((a.answers.resume as Resume).path).then((u) => WebBrowser.openBrowserAsync(u), (e) => toast(errText(e), false)); }} />
+            ) : null}
           </View>
           <TextInput value={notes[a.id] ?? ''} onChangeText={(t) => setNotes((n) => ({ ...n, [a.id]: t }))} placeholder="Note to the applicant (optional)" placeholderTextColor={p.muted}
             maxLength={1000} multiline style={{ marginTop: 12, minHeight: 44, borderWidth: 1.5, borderColor: p.line, borderRadius: R.sm, padding: 10, fontFamily: F.body, fontSize: 15, color: p.ink }} />

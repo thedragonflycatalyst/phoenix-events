@@ -1,11 +1,12 @@
 // Application form: volunteer, event organizer, or app moderator.
+import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Card, Chip, Empty, Field, Txt, useToast } from '@/components/ui';
+import { Button, Card, Chip, Empty, Field, Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
-import { KINDS, submitApplication, type AppKind } from '@/lib/applications';
+import { KINDS, RESUME_MAX, RESUME_TYPES, submitApplication, uploadResume, type AppKind } from '@/lib/applications';
 import { errText } from '@/lib/model';
 import { usePalette } from '@/lib/theme';
 
@@ -31,12 +32,21 @@ export default function ApplyScreen() {
     about: '', experience: '', events: '', hours: '', heard: '', agree: false,
   });
   const [busy, setBusy] = useState(false);
+  const [resume, setResume] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const set = (patch: Partial<typeof a>) => setA((x) => ({ ...x, ...patch }));
   const toggle = (k: 'interests' | 'availability', v: string) => set({ [k]: a[k].includes(v) ? a[k].filter((x) => x !== v) : [...a[k], v] } as Partial<typeof a>);
 
   if (!user) {
     return <View style={{ flex: 1, backgroundColor: p.bg, padding: 16 }}><Empty emoji="🔐" title="Sign in to apply" body="One free account works across all Dragonfly apps." action={<Button title="Sign in" onPress={() => router.replace('/sign-in')} />} /></View>;
   }
+
+  const pickResume = async () => {
+    const r = await DocumentPicker.getDocumentAsync({ type: RESUME_TYPES, copyToCacheDirectory: true, multiple: false });
+    const f = r.canceled ? null : r.assets[0];
+    if (!f) return;
+    if ((f.size ?? 0) > RESUME_MAX) return toast('That file is over 10 MB. Try a PDF version.', false);
+    setResume(f);
+  };
 
   const send = async () => {
     if (a.name.trim().length < 2) return toast('Add your name', false);
@@ -49,6 +59,7 @@ export default function ApplyScreen() {
       if (kind === 'volunteer') Object.assign(answers, { interests: a.interests, availability: a.availability });
       if (kind === 'organizer') Object.assign(answers, { experience: a.experience.trim(), events: a.events.trim() || null });
       if (kind === 'moderator') Object.assign(answers, { experience: a.experience.trim(), hours: a.hours.trim() || null });
+      if (resume) answers.resume = await uploadResume(user.id, { uri: resume.uri, name: resume.name, mimeType: resume.mimeType, size: resume.size });
       await submitApplication(user.id, kind, answers);
       toast('Application sent! The team will get back to you here in the app.');
       router.back();
@@ -91,6 +102,17 @@ export default function ApplyScreen() {
           {kind === 'moderator' && <Field label="Hours a week you can give" hint="(optional)" value={a.hours} onChangeText={(t) => set({ hours: t })} placeholder="About 2" />}
           <Field label={kind === 'volunteer' ? 'Anything you’d like us to know?' : 'Why do you want to help?'} hint="(optional)" value={a.about} onChangeText={(t) => set({ about: t })} multiline style={{ minHeight: 80, textAlignVertical: 'top' }} />
           <Field label="How did you hear about us?" hint="(optional)" value={a.heard} onChangeText={(t) => set({ heard: t })} />
+          <Txt v="bold" style={{ marginBottom: 6, fontSize: 15 }}>Resume <Txt v="small">(optional · PDF, Word or photo, up to 10 MB)</Txt></Txt>
+          {resume ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: p.soft }}>
+              <Icon name="edit_note" color={p.focus} />
+              <View style={{ flex: 1 }}>
+                <Txt v="bold" numberOfLines={1}>{resume.name}</Txt>
+                {resume.size ? <Txt v="small">{Math.max(1, Math.round(resume.size / 1024))} KB</Txt> : null}
+              </View>
+              <Button small kind="quiet" title="Remove" onPress={() => setResume(null)} />
+            </View>
+          ) : <Button kind="ghost" icon="download" title="Attach a resume" onPress={pickResume} style={{ alignSelf: 'flex-start' }} />}
         </Card>
 
         <Pressable onPress={() => set({ agree: !a.agree })} accessibilityRole="checkbox" accessibilityState={{ checked: a.agree }}

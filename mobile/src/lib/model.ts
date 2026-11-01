@@ -40,6 +40,7 @@ export const DONATE_LINKS: Record<string, string> = { '10': '', '25': '', '50': 
 export const PAYPAL_DONATE = '';
 
 const FRIENDLY: Record<string, string> = {
+  resume_too_big: 'That file is over 10 MB. Try a PDF version.',
   phoenix_applications_one_open: 'You already have an application waiting for review.',
   phoenix_application_closed: 'That application was already reviewed.',
   phoenix_tpc_claim: 'Only Phoenix Catalyst leaders can post events hosted by The Phoenix Catalyst. Remove that from the host, name or description.',

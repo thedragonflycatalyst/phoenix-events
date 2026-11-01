@@ -1,5 +1,30 @@
 // In-app applications to volunteer, organize events, or help moderate.
+import * as Crypto from 'expo-crypto';
+import { File } from 'expo-file-system';
 import { sb } from './supabase';
+
+export type Resume = { path: string; name: string; size: number | null };
+export const RESUME_TYPES = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'application/rtf', 'image/jpeg', 'image/png', 'image/heic'];
+export const RESUME_MAX = 10 * 1024 * 1024;
+
+/** Uploads a resume to the applicant's private folder (only they and Phoenix admins can open it). */
+export async function uploadResume(userId: string, file: { uri: string; name: string; mimeType?: string; size?: number }): Promise<Resume> {
+  const type = file.mimeType && RESUME_TYPES.includes(file.mimeType) ? file.mimeType : 'application/pdf';
+  const ext = (file.name.split('.').pop() ?? 'pdf').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) || 'pdf';
+  const path = `${userId}/${Crypto.randomUUID()}.${ext}`;
+  const bytes = await new File(file.uri).arrayBuffer();
+  if (bytes.byteLength > RESUME_MAX) throw new Error('resume_too_big');
+  const { error } = await sb.storage.from('phoenix-resumes').upload(path, bytes, { contentType: type });
+  if (error) throw error;
+  return { path, name: file.name.slice(0, 120), size: bytes.byteLength };
+}
+
+/** A short-lived link to open a resume (admins, or the applicant themself). */
+export async function resumeLink(path: string) {
+  const { data, error } = await sb.storage.from('phoenix-resumes').createSignedUrl(path, 600);
+  if (error || !data?.signedUrl) throw error ?? new Error('resume_missing');
+  return data.signedUrl;
+}
 
 export type AppKind = 'volunteer' | 'organizer' | 'moderator';
 export type AppStatus = 'pending' | 'approved' | 'declined' | 'withdrawn';
