@@ -41,3 +41,12 @@ The app is plain HTML/JS, so it can be wrapped with Capacitor for the App Store 
 ## Releasing changes
 
 Bump the `?v=` number in `index.html`, the imports at the top of `app.js`, and `sw.js` (cache name and file list) so browsers fetch the new files right away.
+
+## Native app (`mobile/`)
+
+The real Android/iPhone app, built with Expo (React Native). It shares the same Supabase database, accounts, calendar feeds and moderation as the web version, so both always show the same events.
+
+- **Test builds:** every push to `mobile/` runs the *Android app* GitHub Action, which publishes an installable APK as the `android-preview` release.
+- **Native features:** on-device flyer reading (Google ML Kit, free), add to the phone's calendar, event reminders, haptics, native maps (MapLibre + OpenFreeMap, free).
+- **Local dev:** `cd mobile && npm install && npx expo run:android` (needs Android Studio), then `npx expo start`.
+- **Checks:** `npx tsc --noEmit` and `npm run test:ocr`.

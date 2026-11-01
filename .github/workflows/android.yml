@@ -1,0 +1,64 @@
+name: Android app
+
+# Builds an installable test APK of the Phoenix Community app and publishes it
+# as the "android-preview" release. Free on public repos; no Expo account needed.
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck and parser tests
+        run: |
+          npx tsc --noEmit
+          npm run -s test:ocr
+
+      - name: Generate native project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      - name: Build APK
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Publish test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk phoenix-community.apk
+          gh release delete android-preview --yes --cleanup-tag || true
+          gh release create android-preview phoenix-community.apk \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "Phoenix Community – Android test build" \
+            --notes "Built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC'). Open this page on your Android phone, download phoenix-community.apk, and tap it to install (allow installing from your browser if asked)."
