@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=12';
-import { readPoster, compressImage } from './ocr.js?v=12';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, HOME } from './config.js?v=13';
+import { readPoster, compressImage } from './ocr.js?v=13';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -108,7 +108,7 @@ function confirmDialog(title, body, okLabel = 'Confirm', danger = false) {
 async function loadMe() {
   const { data: { session } } = await sb.auth.getSession();
   state.user = session?.user ?? null;
-  state.username = null; state.role = null; state.rsvps = new Map();
+  state.username = null; state.role = null; state.rsvps = new Map(); state.avatar = null;
   if (state.user) {
     const [p, r, rs] = await Promise.all([
       sb.from('dragonfly_profiles').select('username').eq('user_id', state.user.id).maybeSingle(),
@@ -116,23 +116,130 @@ async function loadMe() {
       sb.from('phoenix_rsvps').select('event_id,kind').eq('user_id', state.user.id),
     ]);
     state.username = p.data?.username ?? state.user.email;
+    state.avatar = await avatarUrl(state.user.id);
     state.role = r.data?.role ?? null;
     (rs.data ?? []).forEach((x) => state.rsvps.set(x.event_id, x.kind));
   }
   renderAccount();
 }
+/* ---------- shared Dragonfly account (same picture, email and password in every Dragonfly app) ---------- */
+const AVATAR_BUCKET = 'dragonfly-avatars';
+const avatarPath = (uid) => `${uid}/avatar.jpg`;
+async function avatarUrl(uid) {
+  const { data } = await sb.storage.from(AVATAR_BUCKET).createSignedUrl(avatarPath(uid), 3600);
+  if (!data?.signedUrl) return null;
+  const head = await fetch(data.signedUrl, { method: 'HEAD' }).catch(() => null);
+  return head?.ok ? data.signedUrl : null;
+}
+const avatarHtml = (size) => (state.avatar
+  ? `<img src="${h(state.avatar)}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover">`
+  : `<span style="font-size:${Math.round(size * 0.42)}px">${h((state.username || '?').replace(/^@/, '').charAt(0).toUpperCase())}</span>`);
+// Square-crop to 256px JPEG under the bucket's 30 KB limit, like the Uploader
+async function avatarBlob(file) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const side = Math.min(bmp.width, bmp.height);
+  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+  c.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 256, 256);
+  for (const q of [0.85, 0.75, 0.65, 0.55, 0.45, 0.35]) {
+    const b = await new Promise((r) => c.toBlob(r, 'image/jpeg', q));
+    if (b && b.size <= 30000) return b;
+  }
+  throw new Error('That picture is too detailed to save. Try another one.');
+}
+async function reauth(password) {
+  const { error } = await sb.auth.signInWithPassword({ email: state.user.email, password });
+  if (error) throw new Error('Your current password didn’t match.');
+}
+function codeDialog({ title, body, type, email, done }) {
+  openDialog(`<h2>${h(title)}</h2><p>${body}</p><form id="codef"><label class="field"><span>Code from the email</span><input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+    <p class="error" id="codeerr" role="alert"></p><div class="row"><button class="btn" type="submit">Confirm</button><button class="btn ghost" type="button" data-close>Later</button></div></form>`, (d) => {
+    $('#codef', d).addEventListener('submit', async (ev) => {
+      ev.preventDefault(); const btn = ev.target.querySelector('[type=submit]'); busy(btn, true);
+      const { error } = await sb.auth.verifyOtp({ email, token: ev.target.code.value.trim(), type });
+      busy(btn, false);
+      if (error) { $('#codeerr', d).textContent = 'That code didn’t work. Check the newest email and try again.'; return; }
+      d.close(); done?.();
+    });
+  });
+}
 function renderAccount() {
   const el = $('#account');
   if (!state.user) { el.innerHTML = '<button class="btn small" id="signin">Sign in</button>'; $('#signin').onclick = () => authDialog(); return; }
-  el.innerHTML = `<button class="avatar" id="me" aria-label="Your account, @${h(state.username)}">${h((state.username || "?").replace(/^@/, "").charAt(0).toUpperCase())}</button>`;
-  $('#me').onclick = () => openDialog(`<h2>@${h(state.username)}</h2>
-    <p class="muted">${state.role ? `You’re a${state.role === 'admin' ? 'n' : ''} ${h(state.role)} for The Phoenix Catalyst. ` : ''}This is your Dragonfly account, the same one you use across Dragonfly apps.</p>
-    <div class="row">
-      <a class="btn quiet" href="#/mine" data-close>My events</a>
-      ${isMod() ? '<a class="btn quiet" href="#/moderate" data-close>Review posts</a>' : ''}
-      ${state.role === 'admin' ? '<a class="btn quiet" href="#/admin" data-close>Team roles</a>' : ''}
-      <button class="btn ghost" id="signout">Sign out</button>
-    </div>`, (d) => { $('#signout', d).onclick = async () => { await sb.auth.signOut(); d.close(); toast('Signed out'); }; });
+  el.innerHTML = `<button class="avatar" id="me" aria-label="Your account, @${h(state.username)}" style="overflow:hidden;padding:0">${avatarHtml(38)}</button>`;
+  $('#me').onclick = accountDialog;
+}
+function accountDialog() {
+  const verified = !!state.user.email_confirmed_at;
+  openDialog(`<div style="text-align:center">
+      <button type="button" id="pic" class="avatar" style="width:96px;height:96px;margin:0 auto;overflow:hidden;padding:0" aria-label="Change profile picture">${avatarHtml(96)}</button>
+      <input type="file" id="picfile" accept="image/*" class="hidden">
+      <h2 style="margin:12px 0 2px">${h(state.username)}</h2><p class="muted small" style="margin:0">${h(state.user.email)}</p>
+      <p class="muted small">One Dragonfly account for every Dragonfly app. Changes here apply everywhere.</p></div>
+    ${verified ? '' : `<p class="panel"><b>Your email isn’t confirmed yet.</b> <button class="btn small quiet" id="resend" type="button">Send a new code</button></p>`}
+    <div class="row" style="justify-content:center;margin:10px 0">
+      <button class="btn small quiet" id="picbtn" type="button">Change picture</button>
+      ${state.avatar ? '<button class="btn small quiet" id="picdel" type="button">Remove picture</button>' : ''}
+      <button class="btn small quiet" id="chemail" type="button">Change email</button>
+      <button class="btn small quiet" id="chpw" type="button">Change password</button>
+    </div>
+    <form id="acctf" class="hidden"></form>
+    <p class="error" id="accterr" role="alert"></p>
+    <div class="row" style="justify-content:center">
+      <a class="btn small quiet" href="#/mine" data-close>My events</a>
+      ${isMod() ? '<a class="btn small quiet" href="#/moderate" data-close>Review posts</a>' : ''}
+      ${state.role === 'admin' ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a>' : ''}
+      <button class="btn small ghost" id="signout" type="button">Sign out</button>
+    </div>
+    <p class="small muted" style="text-align:center;margin-top:12px">Signed-in devices, data export and account deletion are in the Phoenix and Uploader apps.</p>`, (d) => {
+    const err = $('#accterr', d), form = $('#acctf', d);
+    const fail = (e) => { err.textContent = errText(e); };
+    const pick = () => $('#picfile', d).click();
+    $('#pic', d).onclick = pick; $('#picbtn', d).onclick = pick;
+    $('#picfile', d).onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const blob = await avatarBlob(file);
+        const { error } = await sb.storage.from(AVATAR_BUCKET).upload(avatarPath(state.user.id), blob, { contentType: 'image/jpeg', upsert: true });
+        if (error) throw error;
+        state.avatar = await avatarUrl(state.user.id); renderAccount(); accountDialog(); toast('Picture updated in all Dragonfly apps');
+      } catch (x) { fail(x); }
+    };
+    $('#picdel', d)?.addEventListener('click', async () => {
+      const { error } = await sb.storage.from(AVATAR_BUCKET).remove([avatarPath(state.user.id)]);
+      if (error) return fail(error);
+      state.avatar = null; renderAccount(); accountDialog(); toast('Picture removed');
+    });
+    $('#resend', d)?.addEventListener('click', async () => {
+      const { error } = await sb.auth.resend({ type: 'signup', email: state.user.email });
+      if (error) return fail(error);
+      codeDialog({ title: 'Confirm your email', body: `Enter the code sent to <b>${h(state.user.email)}</b>.`, type: 'signup', email: state.user.email, done: () => { toast('Email confirmed'); loadMe(); } });
+    });
+    $('#chemail', d).onclick = () => {
+      form.classList.remove('hidden'); err.textContent = '';
+      form.innerHTML = `<label class="field"><span>New email</span><input type="email" name="email" required autocomplete="email"></label>
+        <label class="field"><span>Current password</span><input type="password" name="pw" required autocomplete="current-password"></label><button class="btn" type="submit">Change email</button>`;
+      form.onsubmit = async (ev) => {
+        ev.preventDefault(); const next = form.email.value.trim();
+        try { await reauth(form.pw.value); const { error } = await sb.auth.updateUser({ email: next }); if (error) throw error;
+          codeDialog({ title: 'Confirm your new email', body: `Enter the code sent to <b>${h(next)}</b>. If your old address also gets an email, confirm that one too.`, type: 'email_change', email: next, done: () => { toast('Email updated for all Dragonfly apps'); loadMe(); } });
+        } catch (x) { fail(x); }
+      };
+    };
+    $('#chpw', d).onclick = () => {
+      form.classList.remove('hidden'); err.textContent = '';
+      form.innerHTML = `<label class="field"><span>Current password</span><input type="password" name="pw" required autocomplete="current-password"></label>
+        <label class="field"><span>New password (8+ characters)</span><input type="password" name="next" minlength="8" required autocomplete="new-password"></label>
+        <label class="field"><span>Confirm new password</span><input type="password" name="again" required autocomplete="new-password"></label><button class="btn" type="submit">Change password</button>`;
+      form.onsubmit = async (ev) => {
+        ev.preventDefault();
+        if (form.next.value.length < 8) return fail(new Error('Use at least 8 characters.'));
+        if (form.next.value !== form.again.value) return fail(new Error('The new passwords don’t match.'));
+        try { await reauth(form.pw.value); const { error } = await sb.auth.updateUser({ password: form.next.value }); if (error) throw error;
+          form.classList.add('hidden'); toast('Password changed for all Dragonfly apps'); } catch (x) { fail(x); }
+      };
+    };
+    $('#signout', d).onclick = async () => { await sb.auth.signOut(); d.close(); toast('Signed out'); };
+  });
 }
 function requireUser(why) {
   if (state.user) return true;
@@ -164,7 +271,21 @@ function authDialog(why = '', mode = 'in') {
       const email = f.id.value.trim();
       if (!email.includes('@')) { err.textContent = 'Enter your account email above, then press Forgot password.'; return; }
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirect });
-      err.textContent = ''; if (error) err.textContent = errText(error); else toast('Check your email for a reset link');
+      err.textContent = ''; if (error) { err.textContent = errText(error); return; }
+      openDialog(`<h2>Reset password</h2><p>Enter the code we emailed to <b>${h(email)}</b> and choose a new password. It changes your password in every Dragonfly app.</p>
+        <form id="rf"><label class="field"><span>Code from the email</span><input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+        <label class="field"><span>New password (8+ characters)</span><input type="password" name="pw" minlength="8" autocomplete="new-password" required></label>
+        <p class="error" id="rerr" role="alert"></p><button class="btn" type="submit">Save new password</button></form>`, (rd) => {
+        $('#rf', rd).addEventListener('submit', async (ev) => {
+          ev.preventDefault(); const f2 = ev.target, e2 = $('#rerr', rd);
+          if (f2.pw.value.length < 8) { e2.textContent = 'Use at least 8 characters.'; return; }
+          const { error: ve } = await sb.auth.verifyOtp({ email, token: f2.code.value.trim(), type: 'recovery' });
+          if (ve) { e2.textContent = 'That code didn’t work. Check the newest email and try again.'; return; }
+          const { error: ue } = await sb.auth.updateUser({ password: f2.pw.value });
+          if (ue) { e2.textContent = errText(ue); return; }
+          rd.close(); toast('Password changed. You’re signed in.');
+        });
+      });
     });
     f.addEventListener('submit', async (ev) => {
       ev.preventDefault(); err.textContent = ''; busy(btn, true);
@@ -192,7 +313,7 @@ function authDialog(why = '', mode = 'in') {
           if (error) throw error;
           if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('email_already_registered');
           if (data.session) { d.close(); toast('Welcome!'); }
-          else openDialog(`<h2>Confirm your email</h2><p>We sent a link to <b>${h(email)}</b>. Open it on this device to finish signing up.</p><button class="btn" data-close>OK</button>`);
+          else codeDialog({ title: 'Confirm your email', body: `We sent a code to <b>${h(email)}</b>. Enter it to finish creating your account.`, type: 'signup', email, done: () => toast('Welcome! 🔥') });
         }
       } catch (e) { err.textContent = errText(e); } finally { busy(btn, false); }
     });
