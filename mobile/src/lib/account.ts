@@ -3,7 +3,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { File } from 'expo-file-system';
 import { sb, SUPABASE_URL } from './supabase';
 
-const AVATAR_BUCKET = 'dragonfly-avatars';
+export const AVATAR_BUCKET = 'dragonfly-avatars';
 const AVATAR_PIXELS = 256;
 const AVATAR_MAX_BYTES = 30000; // bucket limit
 const ACCOUNT_FN = `${SUPABASE_URL}/functions/v1/dragonfly-account`;

@@ -1,9 +1,12 @@
 // TikTok-style hearts and comments for an event.
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AVATAR_BUCKET, avatarPath } from '@/lib/account';
 import { useApp } from '@/lib/app-state';
+import { sb } from '@/lib/supabase';
 import { compact, eventSocial, listComments, setEventLike, timeAgo, type Comment, type Social } from '@/lib/social';
 import { F, usePalette } from '@/lib/theme';
 import { Icon, Txt, useToast } from './ui';
@@ -19,6 +22,26 @@ export function NameBadge({ name, size = 34 }: { name: string | null; size?: num
       <Text style={{ fontFamily: F.display, fontSize: size * 0.44, color: '#fff' }}>{n.charAt(0).toUpperCase()}</Text>
     </View>
   );
+}
+
+// Signed links to other people's shared Dragonfly pictures, kept for the session
+const picCache = new Map<string, Promise<string | null>>();
+const picFor = (uid: string) => {
+  let p = picCache.get(uid);
+  if (!p) {
+    p = sb.storage.from(AVATAR_BUCKET).createSignedUrl(avatarPath(uid), 3600).then(({ data }) => data?.signedUrl ?? null, () => null);
+    picCache.set(uid, p);
+  }
+  return p;
+};
+
+/** Someone's Dragonfly profile picture, or their colored initial when they haven't set one. */
+export function PersonPic({ uid, name, size = 34 }: { uid: string; name: string | null; size?: number }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { let live = true; void picFor(uid).then((u) => { if (live) setUrl(u); }); return () => { live = false; }; }, [uid]);
+  if (!url || failed) return <NameBadge name={name} size={size} />;
+  return <Image source={{ uri: url }} onError={() => setFailed(true)} style={{ width: size, height: size, borderRadius: size / 2 }} contentFit="cover" accessibilityLabel={`${name ?? 'Neighbor'}’s picture`} />;
 }
 
 /** Solid heart drawn from shapes (the ♥ character turns into a red emoji on Android). Pops when turned on. */
@@ -98,7 +121,7 @@ export function CommentsPreview({ eventId, count, refreshKey }: { eventId: strin
       </View>
       {top.length ? top.map((c) => (
         <View key={c.id} style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-          <NameBadge name={c.username} size={28} />
+          <PersonPic uid={c.user_id} name={c.username} size={28} />
           <View style={{ flex: 1 }}>
             <Txt v="small"><Text style={{ fontFamily: F.bodyBold, color: p.ink }}>@{c.username ?? 'neighbor'}</Text>  {timeAgo(c.created_at)}</Txt>
             <Txt numberOfLines={2}>{c.body}</Txt>

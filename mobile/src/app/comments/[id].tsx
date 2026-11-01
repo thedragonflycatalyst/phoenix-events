@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
-import { Heart, NameBadge } from '@/components/social';
+import { Heart, PersonPic } from '@/components/social';
 import { Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { errText } from '@/lib/model';
@@ -84,7 +84,7 @@ export default function CommentsSheet() {
   const Item = ({ c, reply }: { c: Comment; reply?: boolean }) => (
     <Pressable onLongPress={() => menu(c)} delayLongPress={350} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, paddingLeft: reply ? 44 : 0 }}
       accessibilityHint="Long press for more options">
-      {c.user_id === user?.id ? <Avatar size={reply ? 26 : 34} /> : <NameBadge name={c.username} size={reply ? 26 : 34} />}
+      {c.user_id === user?.id ? <Avatar size={reply ? 26 : 34} /> : <PersonPic uid={c.user_id} name={c.username} size={reply ? 26 : 34} />}
       <View style={{ flex: 1 }}>
         <Text style={{ fontFamily: F.bodyBold, fontSize: 14, color: p.muted }}>@{c.username ?? 'neighbor'}{c.user_id === user?.id ? ' · you' : ''}</Text>
         <Txt style={{ fontSize: 16, lineHeight: 22, marginTop: 2 }}>{c.body}</Txt>
