@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { whenText } from './dates';
 import type { PEvent } from './model';
 import { recall, shareUrl, store } from './supabase';
+import { refreshCalendarWidget } from '@/widget/refresh';
 
 const endOf = (e: PEvent) => new Date(e.ends_at ?? new Date(new Date(e.starts_at).getTime() + 3600e3).toISOString());
 const placeOf = (e: PEvent) => [e.location_name, e.address].filter(Boolean).join(', ');
@@ -32,6 +33,7 @@ export async function addToPhoneCalendar(e: PEvent): Promise<'added' | 'already'
     alarms: [{ relativeOffset: -60 }],
   });
   store('pe.phoneCal', { ...saved, [e.id]: created.id });
+  refreshCalendarWidget();
   return 'added';
 }
 export const isInPhoneCalendar = (id: string) => !!recall<Saved>('pe.phoneCal', {})[id];
@@ -96,5 +98,6 @@ export async function addScanToPhoneCalendar(g: { title: string; start: Date; en
     alarms: [{ relativeOffset: -60 }],
   });
   store('pe.phoneScans', [...done.slice(-199), key]);
+  refreshCalendarWidget();
   return 'added';
 }

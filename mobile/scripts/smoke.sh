@@ -24,6 +24,10 @@ open "phoenix:///sign-in"; shot 09-sign-in 6
 open "phoenix:///filters"; shot 10-filters 6
 open "phoenix:///scan";    shot 10b-scan 8
 adb shell input keyevent KEYCODE_BACK; sleep 2
+open "phoenix:///widget-preview"; shot 10c-widget 8
+open "phoenix:///day/$(date +%Y-%m-%d)"; shot 10d-day 6
+adb shell dumpsys appwidget 2>/dev/null | grep -iE "phoenix|PhoenixCalendar" | head -5 > "$OUT/widget.txt"; [ -s "$OUT/widget.txt" ] || echo "widget provider NOT registered" > "$OUT/widget.txt"
+adb shell input keyevent KEYCODE_BACK; sleep 2
 adb shell dumpsys shortcut 2>/dev/null | grep -iE "id=scan|shortcut_scan|Scan a flyer" | head -5 > "$OUT/shortcuts.txt"; [ -s "$OUT/shortcuts.txt" ] || echo "scan shortcut NOT found in dumpsys shortcut" > "$OUT/shortcuts.txt"
 adb shell cmd uimode night yes
 adb shell am force-stop "$PKG"; adb shell am start -W -n "$PKG/.MainActivity"

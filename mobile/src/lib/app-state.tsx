@@ -6,6 +6,7 @@ import { avatarUrl } from './account';
 import type { Near } from './geo';
 import { HOME, type PEvent, type Role, type RsvpKind } from './model';
 import { recall, sb, store, USERNAME_LOGIN_FN, SUPABASE_KEY } from './supabase';
+import { refreshCalendarWidget } from '@/widget/refresh';
 
 // near: null measures distance from the phone's location; otherwise from a ZIP code
 export type Filters = { when: string; cats: string[]; tags: string[]; cost: string[]; tpc: boolean; q: string; radius: number | null; near: Near | null };
@@ -140,7 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signIn, signUp,
     signOut: async () => { await sb.auth.signOut(); },
     reloadMe: async () => { const { data } = await sb.auth.getUser(); await loadFor(data.user ?? null); },
-    setRsvp: (eventId, kind) => setRsvps((prev) => { const m = new Map(prev); if (kind) m.set(eventId, kind); else m.delete(eventId); return m; }),
+    setRsvp: (eventId, kind) => { setRsvps((prev) => { const m = new Map(prev); if (kind) m.set(eventId, kind); else m.delete(eventId); return m; }); refreshCalendarWidget(); },
     search,
   }), [ready, user, username, role, rsvps, avatar, filters, setFilters, from, originLabel, origin, dataVersion, signIn, signUp, loadFor, search]);
 

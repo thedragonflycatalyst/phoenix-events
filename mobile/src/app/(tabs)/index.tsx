@@ -39,7 +39,7 @@ export default function Explore() {
   useEffect(() => { load(); }, [load, dataVersion]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const heading = day ? fmtDay(fromKey(day)) : filters.when === 'upcoming' ? 'Coming up' : Object.fromEntries(WHENS)[filters.when];
+  const heading = day ? fmtDay(fromKey(day)) : filters.when === 'upcoming' ? 'Coming up' : Object.fromEntries(WHENS)[filters.when] ?? (filters.when.startsWith('day:') ? fmtDay(fromKey(filters.when.slice(4))) : 'Coming up');
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: p.bg }}

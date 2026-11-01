@@ -33,6 +33,9 @@ export const tileWhen = (e: PEvent) => (e.all_day ? `${relDay(e.starts_at)}, all
 
 export function rangeFor(when: string): [Date, Date | null] {
   const now = new Date(), today = startOfDay(now);
+  // A single day picked from the calendar widget: "day:2026-11-14"
+  const picked = /^day:(\d{4})-(\d{2})-(\d{2})$/.exec(when);
+  if (picked) { const d = new Date(+picked[1], +picked[2] - 1, +picked[3]); return [d < now && startOfDay(d).getTime() === today.getTime() ? now : d, addDays(d, 1)]; }
   switch (when) {
     case 'today': return [now, addDays(today, 1)];
     case 'weekend': {
