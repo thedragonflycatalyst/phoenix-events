@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=14';
-import { readPoster, compressImage } from './ocr.js?v=14';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=15';
+import { readPoster, compressImage } from './ocr.js?v=15';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -1387,7 +1387,7 @@ async function viewAbout() {
     <div class="row"><a class="btn ghost" href="#/add">Share a community event</a></div>
     <div class="panel" style="margin-top:20px"><h2>Support our work</h2>
       <p class="muted">The Phoenix Catalyst is a Maryland 501(c)(3) nonprofit. This app is free for everyone, and donations keep it running.</p>
-      ${links.length || PAYPAL_DONATE ? `<div class="donate">${links.map(([k, u]) => `<a class="btn ${k === 'custom' ? 'ghost' : ''}" target="_blank" rel="noopener" href="${h(u)}">${k === 'custom' ? 'Other amount' : `$${k}`}</a>`).join('')}${PAYPAL_DONATE ? `<a class="btn ghost" target="_blank" rel="noopener" href="${h(PAYPAL_DONATE)}">Donate with PayPal</a>` : ''}</div>`
+      ${links.length || PAYPAL_DONATE ? `<div class="donate">${links.map(([k, u]) => `<a class="btn ${k === 'custom' && links.length > 1 ? 'ghost' : ''}" target="_blank" rel="noopener" href="${h(u)}">${k === 'custom' ? (links.length === 1 ? 'Donate by card, Apple Pay or Google Pay' : 'Other amount') : `$${k}`}</a>`).join('')}${PAYPAL_DONATE ? `<a class="btn ghost" target="_blank" rel="noopener" href="${h(PAYPAL_DONATE)}">Donate with PayPal</a>` : ''}</div>`
         : '<p><b>Online donations are opening soon.</b></p>'}
     </div>
     <div class="panel"><h2>How posting works</h2>

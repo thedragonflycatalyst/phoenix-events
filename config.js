@@ -11,7 +11,7 @@ export const DONATE_LINKS = {
   25: '',
   50: '',
   100: '',
-  custom: '',
+  custom: 'https://donate.stripe.com/aFaeVe99a3Knew07Tpfbq00',
 };
 
 // The Phoenix Catalyst's PayPal donate link (a PayPal donate button link or paypal.me). Empty hides it.

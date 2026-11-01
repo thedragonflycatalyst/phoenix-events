@@ -103,7 +103,7 @@ export default function About() {
         <Txt v="small" style={{ fontSize: 16, marginTop: 6 }}>The Phoenix Catalyst is a Maryland 501(c)(3) nonprofit. This app is free for everyone, and donations keep it running.</Txt>
         {links.length || PAYPAL_DONATE ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-            {links.map(([k, u]) => <Button key={k} kind={k === 'custom' ? 'ghost' : 'solid'} title={k === 'custom' ? 'Other amount' : `$${k}`} onPress={() => WebBrowser.openBrowserAsync(u)} style={{ minWidth: 76 }} />)}
+            {links.map(([k, u]) => <Button key={k} kind={k === 'custom' && links.length > 1 ? 'ghost' : 'solid'} title={k === 'custom' ? (links.length === 1 ? 'Donate by card, Apple Pay or Google Pay' : 'Other amount') : `$${k}`} onPress={() => WebBrowser.openBrowserAsync(u)} style={{ minWidth: 76, flexGrow: links.length === 1 ? 1 : 0 }} />)}
             {PAYPAL_DONATE ? <Button kind="ghost" title="Donate with PayPal" onPress={() => WebBrowser.openBrowserAsync(PAYPAL_DONATE)} style={{ minWidth: 76 }} /> : null}
           </View>
         ) : <Txt v="bold" style={{ marginTop: 12 }}>Online donations are opening soon.</Txt>}

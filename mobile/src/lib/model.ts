@@ -36,7 +36,7 @@ export const HOME = { lat: 39.2037, lng: -76.861, name: 'Columbia, MD' };
 
 // Stripe Payment Links on The Phoenix Catalyst's own Stripe account. Empty hides the option.
 // The Phoenix Catalyst's own donation pages (fill in from TPC's Stripe Payment Links and PayPal donate button)
-export const DONATE_LINKS: Record<string, string> = { '10': '', '25': '', '50': '', '100': '', custom: '' };
+export const DONATE_LINKS: Record<string, string> = { '10': '', '25': '', '50': '', '100': '', custom: 'https://donate.stripe.com/aFaeVe99a3Knew07Tpfbq00' };
 export const PAYPAL_DONATE = '';
 
 const FRIENDLY: Record<string, string> = {

@@ -1,7 +1,7 @@
 // App shell cache so the calendar opens fast and works on spotty connections.
 // Event data always comes from the network.
-const CACHE = 'phoenix-events-v14';
-const SHELL = ['./', 'index.html', 'styles.css?v=14', 'app.js?v=14', 'ocr.js?v=14', 'config.js?v=14', 'icon.svg', 'manifest.webmanifest'];
+const CACHE = 'phoenix-events-v15';
+const SHELL = ['./', 'index.html', 'styles.css?v=15', 'app.js?v=15', 'ocr.js?v=15', 'config.js?v=15', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
