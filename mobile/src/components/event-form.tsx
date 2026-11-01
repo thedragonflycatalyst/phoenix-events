@@ -59,7 +59,7 @@ function confirmNotDuplicate(dupe: Dupe): Promise<'post' | 'open' | 'cancel'> {
   ));
 }
 
-export function EventForm({ initial, existing, poster, header, note, phoneDefault = false }: { initial: Draft; existing?: PEvent; poster?: string; header?: React.ReactNode; note?: string; phoneDefault?: boolean }) {
+export function EventForm({ initial, existing, poster, header, note, phoneDefault = false, onPosted }: { initial: Draft; existing?: PEvent; poster?: string; header?: React.ReactNode; note?: string; phoneDefault?: boolean; onPosted?: () => void }) {
   const p = usePalette();
   const toast = useToast();
   const app = useApp();
@@ -137,7 +137,8 @@ export function EventForm({ initial, existing, poster, header, note, phoneDefaul
       }
       app.bump();
       toast((unplaced ? `${existing ? 'Saved' : 'Posted'}. We couldn’t find that place on the map.` : existing ? 'Saved' : 'Posted! Thanks for sharing. 🔥') + phoneNote);
-      if (existing) router.back(); else router.replace({ pathname: '/event/[id]', params: { id: id! } });
+      // Open the new event on top of the tabs so Back returns to the app instead of closing it
+      if (existing) router.back(); else { onPosted?.(); router.push({ pathname: '/event/[id]', params: { id: id! } }); }
     } catch (err) { toast(errText(err), false); } finally { setBusy(false); }
   };
 

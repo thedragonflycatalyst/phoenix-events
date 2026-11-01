@@ -111,6 +111,7 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
   // Title: the largest text that isn't the date; a headline often wraps over two or three lines
   const candidates = lines.filter((l) => !isDateLine(l.text) && !ADDRESS.test(l.text) && !HOST.test(l.text) && !PRESENTS.test(l.text) && l.text.length <= 80);
   const top = [...candidates].sort((a, b) => b.h - a.h)[0];
+  let titleStart: Line | undefined;
   if (top) {
     const near = (a: Line, b: Line) => (a.hasPos ? Math.abs(a.top - b.top) <= top.h * 3.2 : Math.abs(lines.indexOf(a) - lines.indexOf(b)) === 1);
     const group = [top];
@@ -120,6 +121,7 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
       if (next) { group.push(next); grew = true; }
     }
     group.sort((a, b) => a.top - b.top || a.i - b.i).forEach((l) => used.add(l));
+    titleStart = group[0];
     found.title = tidy(group.map((l) => l.text).join(' ')).slice(0, 140);
   }
 
@@ -134,7 +136,7 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
   }
   // "Lakefront Plaza, 10275 Wincopin Circle": the venue sits before the address on the same line
   if (!found.location_name && addr) {
-    const before = (lines.find((l) => l.text.includes(addr[0].split('\n')[0].trim()))?.text ?? '').split(/\b\d{1,6}\s/)[0].replace(/[,\s]+$/, '').replace(/^[^A-Za-z]+/, '');
+    const before = (lines.find((l) => l.text.includes(addr[0].split('\n')[0].trim()))?.text ?? '').split(/\b\d{1,6}\s/)[0].replace(/[,\s]+$/, '').replace(/^[^A-Za-z]+/, '').replace(/^(?:[O0@©•*]\s+)/, '');
     if (before && VENUE.test(before)) found.location_name = tidy(before);
   }
 
@@ -149,16 +151,20 @@ export function parsePoster(rawText: string, rawLines: OcrLine[], ref = new Date
   found.category = guessCategory(text, found.title);
   // Lines that hold part of the address aren't description
   if (addr) lines.filter((l) => addr[0].includes(l.text.replace(/^[^0-9A-Za-z]+/, '').trim())).forEach((l) => used.add(l));
-  found.description = describe(lines, used, isDateLine);
+  found.description = describe(lines, used, isDateLine, titleStart);
   return found;
 }
 
 /** A short, readable description from the flyer's own words: the details that aren't the name, date or address. */
-function describe(lines: Line[], used: Set<Line>, isDateLine: (t: string) => boolean) {
+function describe(lines: Line[], used: Set<Line>, isDateLine: (t: string) => boolean, titleStart?: Line) {
   const keep: string[] = [];
   let last: Line | null = null;
+  // Details come after the headline; anything above it is the picture or the screen around the flyer
+  let started = !titleStart;
   const small = lines.map((l) => l.h).sort((a, b) => a - b)[Math.floor(lines.length / 2)] ?? 10;
   for (const l of [...lines].sort((a, b) => a.top - b.top || a.i - b.i)) {
+    if (l === titleStart) started = true;
+    if (!started) continue;
     if (used.has(l)) { last = l; continue; }
     // A big empty gap (a picture, then the app around the flyer) ends the flyer's text
     if (last && l.hasPos && l.top - last.top > small * 7) break;
@@ -167,6 +173,10 @@ function describe(lines: Line[], used: Set<Line>, isDateLine: (t: string) => boo
     if (isDateLine(t) || ADDRESS.test(t) || HOST.test(t) || PRESENTS.test(t) || /^[\d\s,.-]*[A-Za-z .]+,?\s*(MD|Maryland)\s*\d{5}$/i.test(t)) continue;
     const words = t.split(/\s+/).filter((w) => /[A-Za-z]{2,}/.test(w));
     if (words.length < 2 || (t.match(/[A-Za-z]/g) || []).length / t.length < 0.6) continue;
+    // Misreads: "rLYER", "aMRLETES", tab bars full of single letters ("SQL E X S"), or mostly tiny fragments ("ly Catalyst")
+    const tokens = t.split(/\s+/);
+    if (tokens.some((w) => /[a-z][A-Z]/.test(w) && !/^(Mc|Mac|i[A-Z])/.test(w))) continue;
+    if (tokens.filter((w) => w.replace(/[^A-Za-z0-9$]/g, '').length <= 2 && !/^(a|an|at|by|in|of|on|or|to|we|us|is|it|be|do|go|up|my|no|so|am|pm|&|\$\d+)$/i.test(w.replace(/[^A-Za-z0-9$&]/g, ''))).length / tokens.length >= 0.4) continue;
     const clean = t.replace(/\s*[•·*|]\s*/g, ' · ').replace(/^[^A-Za-z0-9"“($]+/, '');
     keep.push(clean === clean.toUpperCase() ? tidy(clean) : clean);
   }

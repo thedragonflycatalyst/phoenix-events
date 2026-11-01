@@ -76,4 +76,12 @@ assert.equal(y.location_name, 'Symphony Woods Park'); assert.equal(y.address, '1
 assert.equal(y.organizer, 'Howard County Yoga Collective'); assert.equal(y.cost, 'donation'); assert.equal(y.category, 'wellness');
 assert.equal(y.description, '$5 suggested donation · Bring a mat and water · Beginners welcome');
 
-console.log('OCR parser: all 6 flyers, 2 misreads and a real screen photo parsed correctly');
+// Phone photo of the yoga flyer on a laptop, read without usable positions: browser tabs above, sidebar below
+const yp = run([L('unity C X', 9), L('Untitled query| SQL E X S Create Yoga Flyer X +', 9), L('SUNRISE YOGA IN', 30), L('SYMPHONY WOODS', 30),
+  L('Sun, Nov 22 | 8:30am-10am', 20), L('O Symphony Woods Park, 10475 Little Patuxent Pkwy,', 9), L('Columbia, MD 21044', 9),
+  L('$5 suggested donation Bring a mat and water Beginners welcome', 8), L('Presented by Howard County Yoga Collective', 9), L('TEST rLYER', 5), L('ly Catalyst', 9)]);
+assert.equal(yp.title, 'Sunrise Yoga in Symphony Woods');
+assert.equal(yp.location_name, 'Symphony Woods Park');
+assert.equal(yp.description, '$5 suggested donation Bring a mat and water Beginners welcome');
+
+console.log('OCR parser: all 6 flyers, 2 misreads and 2 real screen photos parsed correctly');

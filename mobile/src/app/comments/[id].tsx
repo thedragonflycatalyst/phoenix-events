@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Avatar } from '@/components/avatar';
 import { Heart, NameBadge } from '@/components/social';
 import { Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
@@ -18,7 +19,7 @@ export default function CommentsSheet() {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { user, username, isMod } = useApp();
+  const { user, isMod } = useApp();
   const [items, setItems] = useState<Comment[] | null>(null);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -83,7 +84,7 @@ export default function CommentsSheet() {
   const Item = ({ c, reply }: { c: Comment; reply?: boolean }) => (
     <Pressable onLongPress={() => menu(c)} delayLongPress={350} style={{ flexDirection: 'row', gap: 10, paddingVertical: 10, paddingLeft: reply ? 44 : 0 }}
       accessibilityHint="Long press for more options">
-      <NameBadge name={c.username} size={reply ? 26 : 34} />
+      {c.user_id === user?.id ? <Avatar size={reply ? 26 : 34} /> : <NameBadge name={c.username} size={reply ? 26 : 34} />}
       <View style={{ flex: 1 }}>
         <Text style={{ fontFamily: F.bodyBold, fontSize: 14, color: p.muted }}>@{c.username ?? 'neighbor'}{c.user_id === user?.id ? ' · you' : ''}</Text>
         <Txt style={{ fontSize: 16, lineHeight: 22, marginTop: 2 }}>{c.body}</Txt>
@@ -147,7 +148,7 @@ export default function CommentsSheet() {
         )}
         {user ? (
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
-            <NameBadge name={username} size={34} />
+            <Avatar size={34} />
             <TextInput ref={input} value={text} onChangeText={setText} placeholder={replyTo ? 'Add a reply…' : 'Add a comment…'} placeholderTextColor={p.muted}
               multiline maxLength={500} accessibilityLabel={replyTo ? 'Reply' : 'Comment'}
               style={{ flex: 1, minHeight: 42, maxHeight: 120, borderRadius: R.lg, backgroundColor: p.soft, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, fontFamily: F.body, fontSize: 16, color: p.ink }} />

@@ -81,7 +81,7 @@ export default function Add() {
   if (mode.kind === 'form') {
     return (
       <View style={{ flex: 1, backgroundColor: p.bg, paddingTop: insets.top }}>
-        <EventForm key={formKey} initial={mode.draft} poster={mode.poster} phoneDefault={!!mode.alsoPhone}
+        <EventForm key={formKey} initial={mode.draft} poster={mode.poster} phoneDefault={!!mode.alsoPhone} onPosted={() => setMode({ kind: 'choose' })}
           header={(
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <Txt v="h1">New event</Txt>

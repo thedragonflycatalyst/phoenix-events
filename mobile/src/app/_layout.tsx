@@ -50,7 +50,7 @@ function Shell() {
         <Stack.Screen name="edit/[id]" options={{ title: 'Edit event' }} />
         <Stack.Screen name="sign-in" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.92], sheetGrabberVisible: true, headerShown: false }} />
         <Stack.Screen name="filters" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.75, 0.95], sheetGrabberVisible: true, headerShown: false }} />
-        <Stack.Screen name="comments/[id]" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.72, 0.95], sheetGrabberVisible: true, headerShown: false }} />
+        <Stack.Screen name="comments/[id]" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.92], sheetGrabberVisible: true, headerShown: false }} />
         <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade_from_bottom', statusBarStyle: 'light' }} />
         <Stack.Screen name="account" options={{ title: 'Account' }} />
         <Stack.Screen name="moderate" options={{ title: 'Review posts' }} />
