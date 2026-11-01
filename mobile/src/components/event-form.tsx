@@ -32,7 +32,7 @@ function DateTimeField({ label, value, mode, onChange, optional }: { label: stri
           style={{ minHeight: 50, borderWidth: 1.5, borderColor: p.line, borderRadius: R.sm, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: p.surface }}>
           <Txt color={value ? p.ink : p.muted}>{text}</Txt>
           {optional && value ? <Pressable hitSlop={10} onPress={() => onChange(null)} accessibilityLabel={`Clear ${label}`}><Icon name="close" size={18} color={p.muted} /></Pressable>
-            : <Icon name={mode === 'date' ? 'calendar_month' : 'schedule' as never} size={18} color={p.muted} />}
+            : <Icon name={mode === 'date' ? 'calendar_month' : 'schedule'} size={18} color={p.muted} />}
         </Pressable>
       )}
     </View>

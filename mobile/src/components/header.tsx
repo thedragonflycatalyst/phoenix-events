@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useApp } from '@/lib/app-state';
 import { CATS } from '@/lib/model';
 import { F, R, usePalette } from '@/lib/theme';
+import { Avatar } from './avatar';
 import { Chip, Icon, Txt } from './ui';
 
 export function TopBar() {
@@ -16,9 +17,8 @@ export function TopBar() {
         <Text style={{ fontFamily: F.displayBold, fontSize: 18, color: p.ink }}>Phoenix <Text style={{ color: p.muted }}>Community</Text></Text>
       </View>
       {user ? (
-        <Pressable accessibilityLabel={`Your account, ${username}`} onPress={() => router.push('/mine')}
-          style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: p.ink, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontFamily: F.display, fontSize: 17, color: p.bg }}>{(username ?? '?').charAt(0).toUpperCase()}</Text>
+        <Pressable accessibilityLabel={`Your account, ${username}`} onPress={() => router.push('/account')}>
+          <Avatar size={40} />
         </Pressable>
       ) : (
         <Pressable onPress={() => router.push('/sign-in')} style={{ backgroundColor: p.ink, borderRadius: R.pill, paddingHorizontal: 16, height: 38, justifyContent: 'center' }}>

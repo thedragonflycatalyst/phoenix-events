@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js';
 import * as Location from 'expo-location';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { addDays, rangeFor, startOfDay } from './dates';
+import { avatarUrl } from './account';
 import type { Near } from './geo';
 import { HOME, type PEvent, type Role, type RsvpKind } from './model';
 import { recall, sb, store, USERNAME_LOGIN_FN, SUPABASE_KEY } from './supabase';
@@ -12,6 +13,8 @@ const DEFAULT_FILTERS: Filters = { when: 'upcoming', cats: [], tags: [], cost: [
 
 type Ctx = {
   ready: boolean; user: User | null; username: string | null; role: Role; rsvps: Map<string, RsvpKind>;
+  /** Shared Dragonfly profile picture (same in every Dragonfly app) */
+  avatar: string | null; refreshAvatar: () => Promise<void>;
   isMod: boolean; canTpc: boolean;
   filters: Filters; setFilters: (f: Partial<Filters>) => void; activeFilterCount: number;
   origin: { lat: number; lng: number; mine: boolean } | null;
@@ -33,6 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [role, setRole] = useState<Role>(null);
+  const [avatar, setAvatar] = useState<string | null>(null);
   const [rsvps, setRsvps] = useState<Map<string, RsvpKind>>(new Map());
   const [filters, setFiltersState] = useState<Filters>(() => ({ ...DEFAULT_FILTERS, ...recall<Partial<Filters>>('pe.filters', {}) }));
   const [origin, setOrigin] = useState<Ctx['origin']>(null);
@@ -41,7 +45,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const loadFor = useCallback(async (u: User | null) => {
     setUser(u);
-    if (!u) { setUsername(null); setRole(null); setRsvps(new Map()); return; }
+    if (!u) { setUsername(null); setRole(null); setRsvps(new Map()); setAvatar(null); return; }
+    avatarUrl(u.id).then(setAvatar).catch(() => setAvatar(null));
     const [p, r, rs] = await Promise.all([
       sb.from('dragonfly_profiles').select('username').eq('user_id', u.id).maybeSingle(),
       sb.from('phoenix_roles').select('role').eq('user_id', u.id).maybeSingle(),
@@ -126,17 +131,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<Ctx>(() => ({
-    ready, user, username, role, rsvps,
+    ready, user, username, role, rsvps, avatar,
+    refreshAvatar: async () => { setAvatar(user ? await avatarUrl(user.id) : null); },
     isMod: role === 'admin' || role === 'moderator', canTpc: role === 'admin' || role === 'organizer',
     filters, setFilters,
     activeFilterCount: filters.cats.length + filters.tags.length + filters.cost.length + (filters.tpc ? 1 : 0) + (filters.q ? 1 : 0) + (filters.radius ? 1 : 0),
     origin: from, originLabel, dataVersion, bump: () => setDataVersion((v) => v + 1),
     signIn, signUp,
     signOut: async () => { await sb.auth.signOut(); },
-    reloadMe: () => loadFor(user),
+    reloadMe: async () => { const { data } = await sb.auth.getUser(); await loadFor(data.user ?? null); },
     setRsvp: (eventId, kind) => setRsvps((prev) => { const m = new Map(prev); if (kind) m.set(eventId, kind); else m.delete(eventId); return m; }),
     search,
-  }), [ready, user, username, role, rsvps, filters, setFilters, from, originLabel, origin, dataVersion, signIn, signUp, loadFor, search]);
+  }), [ready, user, username, role, rsvps, avatar, filters, setFilters, from, originLabel, origin, dataVersion, signIn, signUp, loadFor, search]);
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

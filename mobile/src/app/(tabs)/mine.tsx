@@ -1,11 +1,12 @@
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ticket } from '@/components/events';
 import { SectionTitle, TopBar } from '@/components/header';
-import { Button, Card, Empty, Txt, useToast } from '@/components/ui';
+import { Avatar } from '@/components/avatar';
+import { Button, Card, Empty, Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { dayKey } from '@/lib/dates';
 import { errText, type PEvent, type RsvpKind } from '@/lib/model';
@@ -53,12 +54,17 @@ export default function Mine() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: 16, paddingTop: insets.top + 4, paddingBottom: 40 }}>
       <TopBar />
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 14 }}>
-        <View style={{ flex: 1 }}>
-          <Txt v="small" style={{ fontSize: 16 }}>@{app.username}{app.role ? ` · ${app.role}` : ''}</Txt>
-          <Txt v="display">My events</Txt>
-        </View>
-      </View>
+      <Txt v="display" style={{ marginTop: 14 }}>My events</Txt>
+      <Pressable onPress={() => router.push('/account')} accessibilityRole="button" accessibilityLabel="Account settings" style={{ marginTop: 14 }}>
+        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <Avatar size={52} />
+          <View style={{ flex: 1 }}>
+            <Txt v="h3">{app.username}</Txt>
+            <Txt v="small">{app.role ? `Phoenix ${app.role} · ` : ''}Picture, email, password and devices</Txt>
+          </View>
+          <Icon name="chevron_right" color={p.muted} />
+        </Card>
+      </Pressable>
 
       <SectionTitle>Going & volunteering</SectionTitle>
       {going === null ? null : going.length ? going.map(({ e, kind }) => <Ticket key={e.id} e={e} rsvp={kind} />) : (

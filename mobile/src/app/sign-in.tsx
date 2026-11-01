@@ -4,14 +4,15 @@ import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Button, Field, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { errText } from '@/lib/model';
-import { sb, WEB_URL } from '@/lib/supabase';
+import { confirmWithCode, recoverWithCode, resendVerification, sendRecoveryCode } from '@/lib/account';
 import { usePalette } from '@/lib/theme';
 
 export default function SignIn() {
   const p = usePalette();
   const toast = useToast();
   const { signIn, signUp } = useApp();
-  const [mode, setMode] = useState<'in' | 'up' | 'sent'>('in');
+  const [mode, setMode] = useState<'in' | 'up' | 'sent' | 'reset'>('in');
+  const [code, setCode] = useState('');
   const [id, setId] = useState('');
   const [email, setEmail] = useState('');
   const [uname, setUname] = useState('');
@@ -35,18 +36,50 @@ export default function SignIn() {
       }
     } catch (e) { setErr(errText(e)); } finally { setBusy(false); }
   };
+  // Password reset by emailed code, same as the Dragonfly Uploader
   const forgot = async () => {
     if (!id.includes('@')) return setErr('Enter your account email above, then tap Forgot password.');
-    const { error } = await sb.auth.resetPasswordForEmail(id.trim(), { redirectTo: WEB_URL });
-    if (error) setErr(errText(error)); else toast('Check your email for a reset link');
+    setErr(''); setBusy(true);
+    try { await sendRecoveryCode(id.trim()); setPw(''); setMode('reset'); toast('We emailed you a code'); }
+    catch (e) { setErr(errText(e)); } finally { setBusy(false); }
   };
+  const reset = async () => {
+    setErr(''); setBusy(true);
+    try { await recoverWithCode(id.trim(), code, pw); toast('Password changed. You’re signed in.'); router.back(); }
+    catch (e) { setErr(errText(e)); } finally { setBusy(false); }
+  };
+
+  if (mode === 'reset') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: p.bg }}>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingTop: 32 }}>
+          <Txt v="display">Reset password</Txt>
+          <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 24 }}>Enter the code we emailed to {id.trim()} and choose a new password. It changes your password in every Dragonfly app.</Txt>
+          <Field label="Code from the email" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" autoFocus />
+          <Field label="New password" hint="(8+ characters)" value={pw} onChangeText={setPw} secureTextEntry autoComplete="new-password" onSubmitEditing={reset} />
+          {err ? <Txt v="bold" color={p.danger} style={{ marginBottom: 12 }} accessibilityLiveRegion="polite">{err}</Txt> : null}
+          <Button title="Save new password" busy={busy} onPress={reset} />
+          <Button kind="ghost" title="Send a new code" style={{ marginTop: 10 }} onPress={forgot} />
+          <Button kind="quiet" small title="Back to sign in" style={{ alignSelf: 'center', marginTop: 16 }} onPress={() => { setErr(''); setMode('in'); }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
 
   if (mode === 'sent') {
     return (
       <View style={{ flex: 1, backgroundColor: p.bg, padding: 24, paddingTop: 40, gap: 12 }}>
         <Txt v="display">Check your email</Txt>
-        <Txt>We sent a confirmation link to <Txt v="bold">{email}</Txt>. Open it, then come back and sign in.</Txt>
-        <Button title="Sign in" onPress={() => setMode('in')} style={{ marginTop: 12 }} />
+        <Txt>We sent a code to <Txt v="bold">{email}</Txt>. Enter it here to finish creating your account.</Txt>
+        <Field label="Code from the email" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" autoFocus />
+        {err ? <Txt v="bold" color={p.danger} accessibilityLiveRegion="polite">{err}</Txt> : null}
+        <Button title="Confirm account" busy={busy} onPress={async () => {
+          setErr(''); setBusy(true);
+          try { await confirmWithCode(email.trim(), code, 'signup'); toast('Welcome! 🔥'); router.back(); }
+          catch (e) { setErr(errText(e)); } finally { setBusy(false); }
+        }} />
+        <Button kind="ghost" title="Send a new code" onPress={async () => { try { await resendVerification(email.trim()); toast('New code sent'); } catch (e) { setErr(errText(e)); } }} />
+        <Button kind="quiet" small title="Back to sign in" style={{ alignSelf: 'center' }} onPress={() => setMode('in')} />
       </View>
     );
   }
