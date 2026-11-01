@@ -10,6 +10,8 @@ import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/ui';
 import { AppProvider, useApp } from '@/lib/app-state';
+import { checkPendingApplications, setLeaderAlerts } from '@/lib/leader-alerts';
+import { AppState } from 'react-native';
 import { F, usePalette } from '@/lib/theme';
 
 // Links like phoenix:///scan open on top of the tabs, so Back always has somewhere to go
@@ -19,7 +21,13 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Shell() {
   const p = usePalette();
-  const { ready } = useApp();
+  const { ready, role, user } = useApp();
+  // Admins get a phone notification when new applications come in
+  useEffect(() => { if (ready) void setLeaderAlerts(role === 'admin'); }, [ready, role, user?.id]);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active' && role === 'admin') void checkPendingApplications(); });
+    return () => sub.remove();
+  }, [role]);
   const [fontsLoaded] = useFonts({ BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold, AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold });
 
   useEffect(() => { SystemUI.setBackgroundColorAsync(p.bg).catch(() => {}); }, [p.bg]);
@@ -28,8 +36,10 @@ function Shell() {
   // Tapping a reminder opens its event
   useEffect(() => {
     const go = (r: Notifications.NotificationResponse | null) => {
-      const id = r?.notification.request.content.data?.eventId;
+      const data = r?.notification.request.content.data;
+      const id = data?.eventId;
       if (typeof id === 'string') router.push({ pathname: '/event/[id]', params: { id } });
+      else if (data?.url === '/applications') router.push('/applications');
     };
     go(Notifications.getLastNotificationResponse());
     const sub = Notifications.addNotificationResponseReceivedListener(go);
