@@ -35,9 +35,13 @@ export const RADII: [number | null, string][] = [[null, 'Any distance'], [2, 'Wi
 export const HOME = { lat: 39.2037, lng: -76.861, name: 'Columbia, MD' };
 
 // Stripe Payment Links on The Phoenix Catalyst's own Stripe account. Empty hides the option.
+// The Phoenix Catalyst's own donation pages (fill in from TPC's Stripe Payment Links and PayPal donate button)
 export const DONATE_LINKS: Record<string, string> = { '10': '', '25': '', '50': '', '100': '', custom: '' };
+export const PAYPAL_DONATE = '';
 
 const FRIENDLY: Record<string, string> = {
+  phoenix_applications_one_open: 'You already have an application waiting for review.',
+  phoenix_application_closed: 'That application was already reviewed.',
   phoenix_tpc_claim: 'Only Phoenix Catalyst leaders can post events hosted by The Phoenix Catalyst. Remove that from the host, name or description.',
   duplicate_event: 'This event is already on the calendar. Open it from Explore instead of posting it again.',
   phoenix_rate_limited: 'You’ve added 20 events today. You can add more tomorrow.',

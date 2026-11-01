@@ -96,6 +96,7 @@ export default function Mine() {
           <Txt v="h3">Team tools</Txt>
           {app.isMod && <Button kind="quiet" icon="shield_person" title="Review community posts" onPress={() => router.push('/moderate')} />}
           {app.role === 'admin' && <Button kind="quiet" icon="group" title="Team roles" onPress={() => router.push('/admin')} />}
+          {app.role === 'admin' && <Button kind="quiet" icon="person" title="Review applications" onPress={() => router.push('/applications')} />}
         </Card>
       )}
       <Feeds />

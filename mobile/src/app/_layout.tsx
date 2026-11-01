@@ -52,6 +52,8 @@ function Shell() {
         <Stack.Screen name="filters" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.75, 0.95], sheetGrabberVisible: true, headerShown: false }} />
         <Stack.Screen name="comments/[id]" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.92], sheetGrabberVisible: true, headerShown: false }} />
         <Stack.Screen name="day/[date]" options={{ title: '', presentation: 'formSheet', sheetAllowedDetents: [0.7, 0.95], sheetGrabberVisible: true, headerShown: false }} />
+        <Stack.Screen name="apply/[kind]" options={{ title: 'Apply' }} />
+        <Stack.Screen name="applications" options={{ title: 'Applications' }} />
         <Stack.Screen name="widget-preview" options={{ title: '' }} />
         <Stack.Screen name="scan" options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade_from_bottom', statusBarStyle: 'light' }} />
         <Stack.Screen name="account" options={{ title: 'Account' }} />

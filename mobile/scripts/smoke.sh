@@ -20,6 +20,9 @@ open "phoenix:///map";     shot 05-map 15
 open "phoenix:///add";     shot 06-add 6
 open "phoenix:///mine";    shot 07-mine 6
 open "phoenix:///about";   shot 08-about 6
+adb shell input swipe 540 1900 540 600 500; shot 08b-about-volunteer 3
+adb shell input swipe 540 1900 540 600 500; shot 08c-about-donate 3
+open "phoenix:///apply/volunteer"; shot 08d-apply 6
 open "phoenix:///sign-in"; shot 09-sign-in 6
 open "phoenix:///filters"; shot 10-filters 6
 open "phoenix:///scan";    shot 10b-scan 8
