@@ -42,7 +42,7 @@ export default function Add() {
       <View style={{ flex: 1, backgroundColor: p.bg, padding: 16, paddingTop: insets.top + 4 }}>
         <TopBar />
         <View style={{ marginTop: 30 }}>
-          <Empty emoji="📸" title="Share an event" body="Sign in to post events. One free account works across all Dragonfly apps."
+          <Empty emoji="📸" title="Share an event" body="Sign in to post events. It’s free."
             action={<View style={{ gap: 10, alignSelf: 'stretch' }}>
               <Button title="Sign in or create an account" onPress={() => router.push('/sign-in')} />
               <Button kind="ghost" icon="document_scanner" title="Scan a flyer into my phone calendar" onPress={() => router.push('/scan')} />

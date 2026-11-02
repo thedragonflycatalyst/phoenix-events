@@ -17,7 +17,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#120e17",
         "foregroundImage": "./assets/adaptive-icon.png",
-        "monochromeImage": "./assets/adaptive-icon.png"
+        "monochromeImage": "./assets/monochrome-icon.png"
       },
       "permissions": [
         "READ_CALENDAR",

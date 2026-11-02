@@ -43,7 +43,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [blocked, setBlocked] = useState<Set<string>>(new Set());
   const refreshBlocks = useCallback(() => { myBlocks().then(setBlocked).catch(() => {}); }, []);
   const [rsvps, setRsvps] = useState<Map<string, RsvpKind>>(new Map());
-  const [filters, setFiltersState] = useState<Filters>(() => ({ ...DEFAULT_FILTERS, ...recall<Partial<Filters>>('pe.filters', {}) }));
+  const [filters, setFiltersState] = useState<Filters>(() => { const r = recall<Partial<Filters>>('pe.filters', {}); return { ...DEFAULT_FILTERS, radius: r.radius ?? null, near: r.near ?? null }; });
   const [origin, setOrigin] = useState<Ctx['origin']>(null);
   const [dataVersion, setDataVersion] = useState(0);
   const lastUid = useRef<string | null | undefined>(undefined);

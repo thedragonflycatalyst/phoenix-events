@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=19';
-import { readPoster, compressImage } from './ocr.js?v=19';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=20';
+import { readPoster, compressImage } from './ocr.js?v=20';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -51,7 +51,8 @@ function whenText(e) {
 const posterUrl = (p) => (p ? sb.storage.from('phoenix-posters').getPublicUrl(p).data.publicUrl : '');
 function store(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* storage unavailable */ } }
 function recall(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
-function loadFilters() { return { when: 'upcoming', cats: [], tags: [], cost: [], tpc: false, q: '', radius: null, near: null, ...recall('pe.filters', {}) }; }
+// Every visit starts on Everything; only the distance setting is remembered
+function loadFilters() { const r = recall('pe.filters', {}); return { when: 'upcoming', cats: [], tags: [], cost: [], tpc: false, q: '', radius: r.radius ?? null, near: r.near ?? null }; }
 function saveFilters() { store('pe.filters', state.filters); }
 
 let toastTimer;
@@ -217,8 +218,7 @@ function accountDialog() {
   openDialog(`<div style="text-align:center">
       <button type="button" id="pic" class="avatar" style="width:96px;height:96px;margin:0 auto;overflow:hidden;padding:0" aria-label="Change profile picture">${avatarHtml(96)}</button>
       <input type="file" id="picfile" accept="image/*" class="hidden">
-      <h2 style="margin:12px 0 2px">${h(state.username)}</h2><p class="muted small" style="margin:0">${h(state.user.email)}</p>
-      <p class="muted small">One Dragonfly account for every Dragonfly app. Changes here apply everywhere.</p></div>
+      <h2 style="margin:12px 0 2px">${h(state.username)}</h2><p class="muted small" style="margin:0">${h(state.user.email)}</p></div>
     ${verified ? '' : `<p class="panel"><b>Your email isn’t confirmed yet.</b> <button class="btn small quiet" id="resend" type="button">Send a new code</button></p>`}
     <div class="row" style="justify-content:center;margin:10px 0">
       <button class="btn small quiet" id="picbtn" type="button">Change picture</button>
@@ -260,7 +260,7 @@ function accountDialog() {
         const blob = await avatarBlob(file);
         const { error } = await sb.storage.from(AVATAR_BUCKET).upload(avatarPath(state.user.id), blob, { contentType: 'image/jpeg', upsert: true });
         if (error) throw error;
-        state.avatar = await avatarUrl(state.user.id); renderAccount(); accountDialog(); toast('Picture updated in all Dragonfly apps');
+        state.avatar = await avatarUrl(state.user.id); renderAccount(); accountDialog(); toast('Picture updated');
       } catch (x) { fail(x); }
     };
     $('#picdel', d)?.addEventListener('click', async () => {
@@ -280,7 +280,7 @@ function accountDialog() {
       form.onsubmit = async (ev) => {
         ev.preventDefault(); const next = form.email.value.trim();
         try { await reauth(form.pw.value); const { error } = await sb.auth.updateUser({ email: next }); if (error) throw error;
-          codeDialog({ title: 'Confirm your new email', body: `Enter the code sent to <b>${h(next)}</b>. If your old address also gets an email, confirm that one too.`, type: 'email_change', email: next, done: () => { toast('Email updated for all Dragonfly apps'); loadMe(); } });
+          codeDialog({ title: 'Confirm your new email', body: `Enter the code sent to <b>${h(next)}</b>. If your old address also gets an email, confirm that one too.`, type: 'email_change', email: next, done: () => { toast('Email updated'); loadMe(); } });
         } catch (x) { fail(x); }
       };
     };
@@ -294,7 +294,7 @@ function accountDialog() {
         if (form.next.value.length < 8) return fail(new Error('Use at least 8 characters.'));
         if (form.next.value !== form.again.value) return fail(new Error('The new passwords don’t match.'));
         try { await reauth(form.pw.value); const { error } = await sb.auth.updateUser({ password: form.next.value }); if (error) throw error;
-          form.classList.add('hidden'); toast('Password changed for all Dragonfly apps'); } catch (x) { fail(x); }
+          form.classList.add('hidden'); toast('Password changed'); } catch (x) { fail(x); }
       };
     };
     $('#signout', d).onclick = async () => { await sb.auth.signOut(); d.close(); toast('Signed out'); };
@@ -318,7 +318,7 @@ function authDialog(why = '', mode = 'in') {
       <label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required></label>
       <label class="field"><span>Username</span><input type="text" name="username" autocomplete="username" pattern="[A-Za-z0-9][A-Za-z0-9_.\\-]{2,29}" required autocapitalize="none"></label>
       <label class="field"><span>Password</span><input type="password" name="pw" autocomplete="new-password" minlength="8" required></label>
-      <p class="small muted">One account works across all Dragonfly apps. Your username can’t be changed later.</p>
+      <p class="small muted">Your username can’t be changed later.</p>
       <p class="error" id="autherr" role="alert"></p>
       <div class="row"><button class="btn" type="submit">Create account</button><button class="btn ghost" type="button" id="toin">I have an account</button></div>
     </form>`;
@@ -331,7 +331,7 @@ function authDialog(why = '', mode = 'in') {
       if (!email.includes('@')) { err.textContent = 'Enter your account email above, then press Forgot password.'; return; }
       const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: redirect });
       err.textContent = ''; if (error) { err.textContent = errText(error); return; }
-      openDialog(`<h2>Reset password</h2><p>Enter the code we emailed to <b>${h(email)}</b> and choose a new password. It changes your password in every Dragonfly app.</p>
+      openDialog(`<h2>Reset password</h2><p>Enter the code we emailed to <b>${h(email)}</b> and choose a new password.</p>
         <form id="rf"><label class="field"><span>Code from the email</span><input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
         <label class="field"><span>New password (8+ characters)</span><input type="password" name="pw" minlength="8" autocomplete="new-password" required></label>
         <p class="error" id="rerr" role="alert"></p><button class="btn" type="submit">Save new password</button></form>`, (rd) => {
@@ -1105,7 +1105,7 @@ function wireEventForm(existing, extras = {}) {
 async function viewAdd() {
   const root = main();
   if (!state.user) {
-    root.innerHTML = `<div class="empty detail"><h2>Share an event</h2><p>Sign in to post events. One free account works across Dragonfly apps.</p><button class="btn" id="si">Sign in or create an account</button></div>`;
+    root.innerHTML = `<div class="empty detail"><h2>Share an event</h2><p>Sign in to post events. It’s free.</p><button class="btn" id="si">Sign in or create an account</button></div>`;
     $('#si').onclick = () => authDialog('Sign in to add events.');
     return;
   }
@@ -1342,7 +1342,7 @@ async function viewApply(kind) {
   if (!KINDS[kind]) kind = 'volunteer';
   const info = KINDS[kind];
   if (!state.user) {
-    root.innerHTML = `<div class="empty detail"><h2>Sign in to apply</h2><p>One free account works across all Dragonfly apps.</p><button class="btn" id="si">Sign in</button></div>`;
+    root.innerHTML = `<div class="empty detail"><h2>Sign in to apply</h2><p>It’s free and takes a minute.</p><button class="btn" id="si">Sign in</button></div>`;
     $('#si').onclick = () => authDialog('Sign in to apply.');
     return;
   }

@@ -37,7 +37,7 @@ export default function ApplyScreen() {
   const toggle = (k: 'interests' | 'availability', v: string) => set({ [k]: a[k].includes(v) ? a[k].filter((x) => x !== v) : [...a[k], v] } as Partial<typeof a>);
 
   if (!user) {
-    return <View style={{ flex: 1, backgroundColor: p.bg, padding: 16 }}><Empty emoji="🔐" title="Sign in to apply" body="One free account works across all Dragonfly apps." action={<Button title="Sign in" onPress={() => router.replace('/sign-in')} />} /></View>;
+    return <View style={{ flex: 1, backgroundColor: p.bg, padding: 16 }}><Empty emoji="🔐" title="Sign in to apply" body="It’s free and takes a minute." action={<Button title="Sign in" onPress={() => router.replace('/sign-in')} />} /></View>;
   }
 
   const pickResume = async () => {

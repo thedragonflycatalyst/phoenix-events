@@ -101,7 +101,6 @@ export default function Mine() {
       )}
       <Feeds />
       <Button kind="ghost" icon="logout" title="Sign out" style={{ marginTop: 24 }} onPress={async () => { await app.signOut(); toast('Signed out'); }} />
-      <Txt v="small" center style={{ marginTop: 10 }}>One Dragonfly account works across all Dragonfly apps.</Txt>
     </ScrollView>
   );
 }

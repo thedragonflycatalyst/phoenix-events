@@ -50,7 +50,7 @@ export default function Account() {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 });
     if (res.canceled || !res.assets[0]) return;
     const a = res.assets[0];
-    run('photo', async () => { await uploadAvatar(app.user!.id, a.uri, a.width, a.height); await app.refreshAvatar(); }, 'Profile picture updated in all Dragonfly apps');
+    run('photo', async () => { await uploadAvatar(app.user!.id, a.uri, a.width, a.height); await app.refreshAvatar(); }, 'Profile picture updated');
   };
   const photoMenu = () => Alert.alert('Profile picture', 'Your picture shows in every Dragonfly app.', [
     { text: 'Choose a photo', onPress: pickPhoto },
@@ -74,7 +74,6 @@ export default function Account() {
         </Pressable>
         <Txt v="h1" style={{ marginTop: 12 }}>{hasUsername ? app.username : 'Your account'}</Txt>
         <Txt v="small" style={{ fontSize: 15 }}>{email}</Txt>
-        <Txt v="small" center style={{ marginTop: 6 }}>One Dragonfly account for every Dragonfly app. Changes here apply everywhere.</Txt>
         <Txt v="small" center style={{ marginTop: 2 }}>Phoenix Community version {Constants.expoConfig?.version ?? 'dev'}</Txt>
       </View>
 
@@ -107,7 +106,7 @@ export default function Account() {
           <Panel>
             <Txt v="small" style={{ marginBottom: 10 }}>Enter the code sent to {pendingEmail}. If your old address also gets an email, confirm that one too.</Txt>
             <Field label="Code from the email" value={f.code} onChangeText={set('code')} keyboardType="number-pad" autoComplete="one-time-code" />
-            <Button title="Confirm new email" busy={busy === 'emailcode'} onPress={() => run('emailcode', () => confirmWithCode(pendingEmail, f.code, 'email_change'), 'Email updated for all Dragonfly apps', () => { setOpen(null); app.reloadMe(); })} />
+            <Button title="Confirm new email" busy={busy === 'emailcode'} onPress={() => run('emailcode', () => confirmWithCode(pendingEmail, f.code, 'email_change'), 'Email updated', () => { setOpen(null); app.reloadMe(); })} />
           </Panel>
         )}
         <Row icon="key" title="Change password" onPress={() => toggle('password')} open={open === 'password'} />
@@ -117,7 +116,7 @@ export default function Account() {
             <Field label="New password" hint="(8+ characters)" value={f.next} onChangeText={set('next')} secureTextEntry autoComplete="new-password" />
             <Field label="Confirm new password" value={f.confirm} onChangeText={set('confirm')} secureTextEntry autoComplete="new-password" />
             <Button title="Change password" busy={busy === 'password'} onPress={() => f.next !== f.confirm ? toast('The new passwords don’t match', false)
-              : run('password', () => changePassword(email, f.current, f.next), 'Password changed for all Dragonfly apps', () => setOpen(null))} />
+              : run('password', () => changePassword(email, f.current, f.next), 'Password changed', () => setOpen(null))} />
           </Panel>
         )}
         <Row icon="devices" title="Signed-in devices" sub="See where you’re signed in" onPress={() => { toggle('devices'); if (open !== 'devices') loadDevices(); }} open={open === 'devices'} last={open !== 'devices'} />

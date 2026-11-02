@@ -54,7 +54,7 @@ export default function SignIn() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: p.bg }}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingTop: 32 }}>
           <Txt v="display">Reset password</Txt>
-          <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 24 }}>Enter the code we emailed to {id.trim()} and choose a new password. It changes your password in every Dragonfly app.</Txt>
+          <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 24 }}>Enter the code we emailed to {id.trim()} and choose a new password.</Txt>
           <Field label="Code from the email" value={code} onChangeText={setCode} keyboardType="number-pad" autoComplete="one-time-code" autoFocus />
           <Field label="New password" hint="(8+ characters)" value={pw} onChangeText={setPw} secureTextEntry autoComplete="new-password" onSubmitEditing={reset} />
           {err ? <Txt v="bold" color={p.danger} style={{ marginBottom: 12 }} accessibilityLiveRegion="polite">{err}</Txt> : null}
@@ -88,7 +88,7 @@ export default function SignIn() {
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, paddingTop: 32 }}>
         <Txt v="display">{mode === 'in' ? 'Welcome back' : 'Join the community'}</Txt>
         <Txt v="small" style={{ fontSize: 16, marginTop: 8, marginBottom: 24 }}>
-          {mode === 'in' ? 'Use the same account you use for the Dragonfly Uploader and other Dragonfly apps.' : 'Already have a Dragonfly account from another Dragonfly app? Sign in with it instead.'}
+          {mode === 'in' ? 'Sign in with your email or username.' : 'Create a free account to post events, RSVP and volunteer.'}
         </Txt>
         {mode === 'in' ? (
           <>
