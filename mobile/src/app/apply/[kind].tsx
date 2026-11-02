@@ -52,6 +52,7 @@ export default function ApplyScreen() {
     if (a.name.trim().length < 2) return toast('Add your name', false);
     if (kind === 'volunteer' && !a.interests.length) return toast('Pick at least one way you’d like to help', false);
     if (kind !== 'volunteer' && a.experience.trim().length < 10) return toast('Tell us a little about your experience', false);
+    if (!a.adult) return toast('You need to be 18 or older to apply', false);
     if (!a.agree) return toast('Please agree to the guidelines', false);
     setBusy(true);
     try {
@@ -82,7 +83,7 @@ export default function ApplyScreen() {
             <Txt v="bold" style={{ flex: 1 }}>I’m 18 or older</Txt>
             <Switch value={a.adult} onValueChange={(v) => set({ adult: v })} trackColor={{ true: p.focus, false: p.line }} thumbColor="#fff" />
           </View>
-          {!a.adult && <Txt v="small" style={{ marginTop: 6 }}>Welcome! Volunteers under 18 need a parent or guardian’s OK, and the team will reach out about that.</Txt>}
+          {!a.adult && <Txt v="small" style={{ marginTop: 6 }}>Volunteers, organizers and moderators must be 18 or older. You’re still welcome at our events with a parent or guardian, and at youth events where our approved chaperones supervise.</Txt>}
         </Card>
 
         {kind === 'volunteer' && (
@@ -123,7 +124,7 @@ export default function ApplyScreen() {
           <Txt style={{ flex: 1, fontSize: 15 }}>{RULES[kind]}</Txt>
         </Pressable>
 
-        <Button title="Send application" busy={busy} onPress={send} style={{ marginTop: 18 }} />
+        <Button title="Send application" busy={busy} disabled={!a.adult} onPress={send} style={{ marginTop: 18 }} />
         <Txt v="small" center style={{ marginTop: 10 }}>Only Phoenix Catalyst admins can see your application.</Txt>
       </ScrollView>
     </KeyboardAvoidingView>

@@ -78,6 +78,7 @@ export function Ticket({ e, rsvp }: { e: PEvent; rsvp?: RsvpKind }) {
           <Txt v="small" numberOfLines={1}>{whenText(e)}{e.location_name ? `, ${e.location_name}` : ''}</Txt>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
             {e.is_tpc && <Badge label="Phoenix Catalyst" tone="ink" />}
+            {e.is_youth && <Badge label="Youth event" tone="good" />}
             <Badge label={COST[e.cost]} />
             {rsvp && <Badge label={rsvp === 'volunteer' ? 'Volunteering' : 'Going'} tone="good" />}
             {e.going_count > 0 && <Badge label={`${e.going_count} going`} />}

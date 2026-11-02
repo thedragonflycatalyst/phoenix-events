@@ -15,7 +15,7 @@ import { sb } from '@/lib/supabase';
 import { F, R, usePalette } from '@/lib/theme';
 import { Button, Card, Chip, Field, Icon, Txt, useToast } from './ui';
 
-export type Draft = Partial<Pick<PEvent, 'title' | 'category' | 'location_name' | 'address' | 'organizer' | 'cost' | 'url' | 'description' | 'is_tpc' | 'volunteer_slots' | 'all_day'>> & {
+export type Draft = Partial<Pick<PEvent, 'title' | 'category' | 'location_name' | 'address' | 'organizer' | 'cost' | 'url' | 'description' | 'is_tpc' | 'is_youth' | 'chaperone_ratio' | 'volunteer_slots' | 'all_day'>> & {
   tags?: string[]; start?: Date | null; end?: Date | null;
 };
 
@@ -94,7 +94,11 @@ export function EventForm({ initial, existing, poster, header, note, phoneDefaul
       location_name: d.location_name?.trim() || null, address: d.address?.trim() || null, organizer: d.organizer?.trim() || null,
       cost: d.cost, tags: d.tags ?? [], url: url || null, description: d.description?.trim() || null,
     };
-    if (app.canTpc) { row.is_tpc = !!d.is_tpc; row.volunteer_slots = d.volunteer_slots || null; }
+    if (app.canTpc) {
+      row.is_tpc = !!d.is_tpc; row.volunteer_slots = d.volunteer_slots || null;
+      row.is_youth = !!d.is_tpc && !!d.is_youth; row.chaperone_ratio = row.is_youth ? d.chaperone_ratio?.trim() || null : null;
+      if (row.is_youth && !row.chaperone_ratio) { toast('Add the chaperone ratio for this youth event, like 1 adult per 8 kids', false); return; }
+    }
     setBusy(true);
     try {
       // Safeguard: check for the same event before uploading anything
@@ -197,6 +201,15 @@ export function EventForm({ initial, existing, poster, header, note, phoneDefaul
           </View>
           {d.is_tpc && <View style={{ marginTop: 14 }}><Field label="Volunteer spots" hint="(blank for unlimited)" keyboardType="number-pad" value={d.volunteer_slots ? String(d.volunteer_slots) : ''}
             onChangeText={(t) => set({ volunteer_slots: t ? Math.max(1, Math.min(1000, Number(t.replace(/\D/g, '')) || 1)) : null })} /></View>}
+          {d.is_tpc && (
+            <View style={{ marginTop: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1 }}><Txt v="bold">🧒 Youth event</Txt><Txt v="small">For kids and teens, supervised by approved adult chaperones</Txt></View>
+                <Switch value={!!d.is_youth} onValueChange={(v) => set({ is_youth: v })} trackColor={{ true: p.cat.wellness, false: p.line }} thumbColor="#fff" accessibilityLabel="Youth event" />
+              </View>
+              {d.is_youth && <View style={{ marginTop: 14 }}><Field label="Chaperone ratio" placeholder="1 adult per 8 kids" value={d.chaperone_ratio ?? ''} onChangeText={(t) => set({ chaperone_ratio: t })} maxLength={80} /></View>}
+            </View>
+          )}
         </Card>
       )}
       {!existing && (

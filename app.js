@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=18';
-import { readPoster, compressImage } from './ocr.js?v=18';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=19';
+import { readPoster, compressImage } from './ocr.js?v=19';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -483,7 +483,7 @@ function evRow(e) {
     <span class="date" aria-hidden="true"><small>${h(dowShort(e.starts_at))}</small><b>${new Date(e.starts_at).getDate()}</b></span>
     <span class="body"><span class="t">${h(e.title)}</span>
       <span class="meta">${h(whenText(e))}${e.location_name ? `, ${h(e.location_name)}` : ''}</span>
-      <span class="badges">${e.is_tpc ? '<span class="badge tpc">Phoenix Catalyst</span>' : ''}<span class="badge">${h(COST[e.cost])}</span>
+      <span class="badges">${e.is_tpc ? '<span class="badge tpc">Phoenix Catalyst</span>' : ''}${e.is_youth ? '<span class="badge">Youth event</span>' : ''}<span class="badge">${h(COST[e.cost])}</span>
         ${rs ? `<span class="badge me">${rs === 'volunteer' ? 'Volunteering' : 'Going'}</span>` : ''}${e.going_count ? `<span class="badge">${e.going_count} going</span>` : ''}</span></span>
     <span class="thumb">${cover(e)}</span></a>`;
 }
@@ -863,6 +863,7 @@ async function viewEvent(id) {
       <div>${ico('<path d="M3 9a2 2 0 0 0 0 4v5h18v-5a2 2 0 0 0 0-4V6H3z"/><path d="M14 6v12" stroke-dasharray="2 2"/>')}<span><b>${h(COST[e.cost])}</b>${e.tags.length ? `<br><span class="muted">Good for ${e.tags.map((t) => h(TAG[t].toLowerCase())).join(', ')}</span>` : ''}</span></div>
       <div>${ico('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>')}<span><b>${e.going_count ? `${e.going_count} neighbor${e.going_count === 1 ? '' : 's'} going` : 'Be the first to say you’re going'}</b>${e.is_tpc ? `<br><span class="muted">${e.volunteer_count}${e.volunteer_slots ? ` of ${e.volunteer_slots}` : ''} volunteer spots filled</span>` : ''}</span></div>
     </div>
+    ${e.is_youth ? `<div class="panel" style="margin-top:16px"><b>🧒 Youth event${e.chaperone_ratio ? ` · ${h(e.chaperone_ratio)}` : ''}</b><p class="small muted" style="margin:4px 0 0">Youth event: approved adult chaperones supervise at this ratio. Volunteers here must be 18+ and cleared by the team.</p></div>` : ''}
     ${e.description ? `<h2 style="margin:22px 0 8px">About</h2><p class="desc">${h(e.description)}</p>` : ''}
     ${e.url ? `<p><a target="_blank" rel="noopener nofollow" href="${h(e.url)}">More info from the organizer</a></p>` : ''}
     <div class="rsvpbar">
@@ -997,7 +998,9 @@ function eventForm(e = {}, note = '') {
     <label class="field"><span>Link <span class="muted small">(optional)</span></span><input type="url" name="url" maxlength="500" placeholder="https://" value="${h(e.url)}"></label>
     <label class="field"><span>Details</span><textarea name="description" maxlength="5000">${h(e.description)}</textarea></label>
     ${canTpc() ? `<div class="panel"><label class="check"><input type="checkbox" name="is_tpc" ${e.is_tpc ? 'checked' : ''}> Official Phoenix Catalyst volunteer event</label>
-      <label class="field"><span>Volunteer spots <span class="muted small">(blank for unlimited)</span></span><input type="number" name="slots" min="1" max="1000" value="${h(e.volunteer_slots)}"></label></div>` : ''}
+      <label class="field"><span>Volunteer spots <span class="muted small">(blank for unlimited)</span></span><input type="number" name="slots" min="1" max="1000" value="${h(e.volunteer_slots)}"></label>
+      <label class="check"><input type="checkbox" name="is_youth" ${e.is_youth ? 'checked' : ''}> 🧒 Youth event (kids and teens, supervised by approved adult chaperones)</label>
+      <label class="field"><span>Chaperone ratio <span class="muted small">(required for youth events)</span></span><input type="text" name="chaperone_ratio" maxlength="80" placeholder="1 adult per 8 kids" value="${h(e.chaperone_ratio)}"></label></div>` : ''}
     <p class="error" id="formerr" role="alert"></p>
     <div class="row"><button class="btn" type="submit">${e.id ? 'Save changes' : 'Post event'}</button><a class="btn ghost" href="${e.id ? `#/event/${e.id}` : '#/'}">Cancel</a></div>
   </form>`;
@@ -1052,7 +1055,11 @@ function wireEventForm(existing, extras = {}) {
       cost: f.cost.value, tags: [...f.querySelectorAll('[name=tags]:checked')].map((x) => x.value), url: url || null,
       description: f.description.value.trim() || null,
     };
-    if (canTpc()) { row.is_tpc = !!f.is_tpc?.checked; row.volunteer_slots = f.slots?.value ? Number(f.slots.value) : null; }
+    if (canTpc()) {
+      row.is_tpc = !!f.is_tpc?.checked; row.volunteer_slots = f.slots?.value ? Number(f.slots.value) : null;
+      row.is_youth = row.is_tpc && !!f.is_youth?.checked; row.chaperone_ratio = row.is_youth ? f.chaperone_ratio.value.trim() || null : null;
+      if (row.is_youth && !row.chaperone_ratio) { err.textContent = 'Add the chaperone ratio for this youth event, like 1 adult per 8 kids.'; f.chaperone_ratio.focus(); return; }
+    }
     if (!canTpc() && (CLAIMS_TPC.test(row.organizer || '') || CLAIMS_TPC.test(row.title))) { err.textContent = FRIENDLY.phoenix_tpc_claim; f.organizer.focus(); return; }
     busy(btn, true, 'Saving…');
     try {
@@ -1350,7 +1357,7 @@ async function viewApply(kind) {
         <label class="field"><span>Phone <span class="muted small">(optional, for event-day updates)</span></span><input type="tel" name="phone" maxlength="40" autocomplete="tel"></label>
         <p class="small muted" style="margin-top:-6px">We’ll also use the email on your account${state.user.email ? ` (${h(state.user.email)})` : ''}.</p>
         <label class="check"><input type="checkbox" name="adult" checked> I’m 18 or older</label>
-        <p class="small muted" id="minor" hidden>Welcome! Volunteers under 18 need a parent or guardian’s OK, and the team will reach out about that.</p>
+        <p class="small muted" id="minor" hidden>Volunteers, organizers and moderators must be 18 or older. You’re still welcome at our events with a parent or guardian, and at youth events where our approved chaperones supervise.</p>
       </div>
       ${kind === 'volunteer' ? `<div class="panel"><fieldset style="border:0;padding:0;margin:0"><legend><h3>How would you like to help?</h3></legend>${chipBoxes('interests', INTERESTS)}</fieldset>
         <fieldset style="border:0;padding:0;margin:10px 0 0"><legend><h3>When are you usually free?</h3></legend>${chipBoxes('availability', FREE_WHEN)}</fieldset></div>` : ''}
@@ -1382,6 +1389,7 @@ async function viewApply(kind) {
     if (kind !== 'volunteer' && val('experience').length < 10) { err.textContent = 'Tell us a little about your experience.'; f.experience.focus(); return; }
     const file = f.resume.files[0];
     if (file && file.size > RESUME_MAX) { err.textContent = FRIENDLY.resume_too_big; return; }
+    if (!f.adult.checked) { err.textContent = 'You need to be 18 or older to apply.'; return; }
     if (!f.agree.checked) { err.textContent = 'Please agree to the guidelines.'; return; }
     const btn = f.querySelector('[type=submit]'); busy(btn, true, 'Sending…');
     let uploaded = null;

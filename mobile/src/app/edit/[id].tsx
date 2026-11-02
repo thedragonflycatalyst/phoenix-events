@@ -20,7 +20,7 @@ export default function EditEvent() {
     <EventForm existing={e} initial={{
       title: e.title, category: e.category, start: new Date(e.starts_at), end: e.ends_at ? new Date(e.ends_at) : null, all_day: e.all_day,
       location_name: e.location_name ?? '', address: e.address ?? '', organizer: e.organizer ?? '', cost: e.cost, tags: e.tags, url: e.url ?? '',
-      description: e.description ?? '', is_tpc: e.is_tpc, volunteer_slots: e.volunteer_slots,
+      description: e.description ?? '', is_tpc: e.is_tpc, is_youth: e.is_youth, chaperone_ratio: e.chaperone_ratio, volunteer_slots: e.volunteer_slots,
     }} />
   );
 }

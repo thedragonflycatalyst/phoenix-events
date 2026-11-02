@@ -129,6 +129,13 @@ export default function EventScreen() {
               sub={e.is_tpc ? `${e.volunteer_count}${e.volunteer_slots ? ` of ${e.volunteer_slots}` : ''} volunteer spots filled` : undefined} />
           </Card>
 
+          {e.is_youth && (
+            <Card style={{ marginTop: 14, borderLeftWidth: 4, borderLeftColor: c }}>
+              <Txt v="bold">🧒 Youth event{e.chaperone_ratio ? ` · ${e.chaperone_ratio}` : ''}</Txt>
+              <Txt v="small" style={{ marginTop: 4 }}>Youth event: approved adult chaperones supervise at this ratio. Volunteers here must be 18+ and cleared by the team.</Txt>
+            </Card>
+          )}
+
           {e.description ? <><Txt v="h2" style={{ marginTop: 24, marginBottom: 8 }}>About</Txt><Txt>{e.description}</Txt></> : null}
           {e.url ? <Button kind="ghost" small icon="public" title="More info from the organizer" style={{ alignSelf: 'flex-start', marginTop: 14 }} onPress={() => WebBrowser.openBrowserAsync(e.url!)} /> : null}
           <Txt v="small" style={{ marginTop: 18 }}>Posted by @{e.created_by_username || 'neighbor'}{e.source === 'poster' ? ' from a flyer photo' : ''}. Details can change, so check with the organizer.</Txt>
