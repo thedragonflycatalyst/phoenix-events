@@ -2,10 +2,12 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Ticket } from '@/components/events';
-import { Button, Card, Empty, Txt, useToast } from '@/components/ui';
+import { confirmSuspend } from '@/components/safety';
+import { Button, Card, Empty, Field, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { fmtShort } from '@/lib/dates';
 import { errText, type PEvent } from '@/lib/model';
+import { listBans, unbanUser, type Ban } from '@/lib/safety';
 import { sb } from '@/lib/supabase';
 import { usePalette } from '@/lib/theme';
 
@@ -42,6 +44,7 @@ export default function Moderate() {
             onPress={() => act(() => sb.from('phoenix_flags').update({ resolved_at: new Date().toISOString() }).eq('id', f.flag_id), 'Report handled')} />
         </Card>
       )) : <Txt v="small" style={{ marginBottom: 10 }}>No open reports.</Txt>}
+      <Suspensions />
       <Txt v="h2" style={{ marginTop: 18, marginBottom: 10 }}>Not reviewed yet ({queue.length})</Txt>
       {queue.length ? queue.map((e) => (
         <View key={e.id} style={{ marginBottom: 8 }}>
@@ -55,5 +58,34 @@ export default function Moderate() {
         </View>
       )) : <Txt v="small">You’re all caught up.</Txt>}
     </ScrollView>
+  );
+}
+
+/** Suspended accounts: lift a suspension, or suspend someone by username. */
+function Suspensions() {
+  const p = usePalette();
+  const toast = useToast();
+  const [bans, setBans] = useState<Ban[]>([]);
+  const [name, setName] = useState('');
+  const load = useCallback(() => { listBans().then(setBans).catch(() => {}); }, []);
+  useFocusEffect(load);
+  return (
+    <View style={{ marginTop: 18 }}>
+      <Txt v="h2" style={{ marginBottom: 10 }}>Suspended accounts ({bans.length})</Txt>
+      {bans.map((b) => (
+        <Card key={b.username ?? b.banned_at} style={{ marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Txt v="bold">@{b.username ?? 'unknown'}</Txt>
+            <Txt v="small">{b.until ? `Until ${fmtShort(b.until)}` : 'Until lifted'}{b.reason ? ` · ${b.reason}` : ''}</Txt>
+          </View>
+          <Button small kind="quiet" title="Lift" onPress={() => { if (b.username) unbanUser(b.username).then(() => { toast('Suspension lifted'); load(); }, (e) => toast(errText(e), false)); }} />
+        </Card>
+      ))}
+      <Card style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+        <View style={{ flex: 1 }}><Field label="Suspend someone" value={name} onChangeText={setName} placeholder="Username" autoCapitalize="none" autoCorrect={false} style={{ marginBottom: 0 }} /></View>
+        <Button small kind="danger" title="Suspend" disabled={!name.trim()} onPress={() => confirmSuspend(name.trim().replace(/^@/, ''), toast, () => { setName(''); load(); })} style={{ marginBottom: 16 }} />
+      </Card>
+      <Txt v="small" style={{ marginTop: 6, color: p.muted }}>Suspended people can still read the calendar but can’t post, comment, RSVP, report or apply.</Txt>
+    </View>
   );
 }

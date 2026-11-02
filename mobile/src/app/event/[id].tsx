@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Poster } from '@/components/events';
+import { confirmBlock, confirmSuspend } from '@/components/safety';
 import { CommentsPreview, SocialRail, useSocial } from '@/components/social';
 import { Button, Card, Empty, Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
@@ -137,6 +138,8 @@ export default function EventScreen() {
             {(mine || app.isMod || (e.is_tpc && app.canTpc)) && <Button small kind="quiet" icon="edit" title="Edit" onPress={() => router.push({ pathname: '/edit/[id]', params: { id: e.id } })} />}
             {(mine || app.isAdmin) && <Button small kind="danger" icon="delete" title="Delete" onPress={del} />}
             {!mine && <Button small kind="quiet" icon="flag" title="Report a problem" onPress={() => app.user ? setBusy('flag') : router.push('/sign-in')} />}
+            {!mine && app.user && <Button small kind="quiet" title="Block poster" onPress={() => confirmBlock(e.created_by, e.created_by_username, toast, () => { app.refreshBlocks(); app.bump(); router.back(); })} />}
+            {!mine && app.isMod && <Button small kind="danger" title="Suspend poster" onPress={() => confirmSuspend(e.created_by_username, toast, () => { app.bump(); load(); })} />}
           </View>
           {busy === 'flag' && <FlagBox eventId={e.id} onDone={() => setBusy(null)} />}
 

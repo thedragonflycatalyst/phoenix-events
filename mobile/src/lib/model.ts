@@ -41,6 +41,9 @@ export const PAYPAL_DONATE = '';
 
 const FRIENDLY: Record<string, string> = {
   resume_too_big: 'That file is over 10 MB. Try a PDF version.',
+  phoenix_banned: 'Your account can’t post, comment or RSVP right now because a moderator suspended it. Reply to any Phoenix email if you think this is a mistake.',
+  phoenix_cannot_ban_leader: 'Leaders can only be suspended by someone above them, and the owner can’t be suspended.',
+  phoenix_cannot_ban_self: 'You can’t suspend yourself.',
   phoenix_owner_locked: 'The owner’s role can’t be changed.',
   phoenix_owner_only: 'Only the owner can make or remove admins.',
   phoenix_applications_one_open: 'You already have an application waiting for review.',

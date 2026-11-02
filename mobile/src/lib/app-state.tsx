@@ -7,6 +7,7 @@ import type { Near } from './geo';
 import { HOME, type PEvent, type Role, type RsvpKind } from './model';
 import { recall, sb, store, USERNAME_LOGIN_FN, SUPABASE_KEY } from './supabase';
 import { refreshCalendarWidget } from '@/widget/refresh';
+import { myBlocks } from './safety';
 
 // near: null measures distance from the phone's location; otherwise from a ZIP code
 export type Filters = { when: string; cats: string[]; tags: string[]; cost: string[]; tpc: boolean; q: string; radius: number | null; near: Near | null };
@@ -17,6 +18,7 @@ type Ctx = {
   /** Shared Dragonfly profile picture (same in every Dragonfly app) */
   avatar: string | null; refreshAvatar: () => Promise<void>;
   isMod: boolean; canTpc: boolean; isAdmin: boolean;
+  blocked: Set<string>; refreshBlocks: () => void;
   filters: Filters; setFilters: (f: Partial<Filters>) => void; activeFilterCount: number;
   origin: { lat: number; lng: number; mine: boolean } | null;
   /** Where distances are measured from, in words */
@@ -38,6 +40,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [role, setRole] = useState<Role>(null);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState<Set<string>>(new Set());
+  const refreshBlocks = useCallback(() => { myBlocks().then(setBlocked).catch(() => {}); }, []);
   const [rsvps, setRsvps] = useState<Map<string, RsvpKind>>(new Map());
   const [filters, setFiltersState] = useState<Filters>(() => ({ ...DEFAULT_FILTERS, ...recall<Partial<Filters>>('pe.filters', {}) }));
   const [origin, setOrigin] = useState<Ctx['origin']>(null);
@@ -46,7 +50,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const loadFor = useCallback(async (u: User | null) => {
     setUser(u);
-    if (!u) { setUsername(null); setRole(null); setRsvps(new Map()); setAvatar(null); return; }
+    if (!u) { setUsername(null); setRole(null); setRsvps(new Map()); setAvatar(null); setBlocked(new Set()); return; }
+    myBlocks().then(setBlocked).catch(() => {});
     avatarUrl(u.id).then(setAvatar).catch(() => setAvatar(null));
     const [p, r, rs] = await Promise.all([
       sb.from('dragonfly_profiles').select('username').eq('user_id', u.id).maybeSingle(),
@@ -102,8 +107,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       p_lat: o?.lat ?? null, p_lng: o?.lng ?? null, p_radius_mi: f.radius ?? null, p_limit: limit,
     });
     if (error) throw error;
-    return (data ?? []) as PEvent[];
-  }, [filters, origin]);
+    // Hide posts from people you've blocked
+    return ((data ?? []) as PEvent[]).filter((e) => !blocked.has(e.created_by));
+  }, [filters, origin, blocked]);
 
   const signIn = useCallback(async (id: string, password: string) => {
     if (id.includes('@')) {
@@ -134,7 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     ready, user, username, role, rsvps, avatar,
     refreshAvatar: async () => { setAvatar(user ? await avatarUrl(user.id) : null); },
-    isAdmin: role === 'admin' || role === 'owner',
+    isAdmin: role === 'admin' || role === 'owner', blocked, refreshBlocks,
     isMod: role === 'owner' || role === 'admin' || role === 'moderator', canTpc: role === 'owner' || role === 'admin' || role === 'organizer',
     filters, setFilters,
     activeFilterCount: filters.cats.length + filters.tags.length + filters.cost.length + (filters.tpc ? 1 : 0) + (filters.q ? 1 : 0) + (filters.radius ? 1 : 0),
@@ -144,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reloadMe: async () => { const { data } = await sb.auth.getUser(); await loadFor(data.user ?? null); },
     setRsvp: (eventId, kind) => { setRsvps((prev) => { const m = new Map(prev); if (kind) m.set(eventId, kind); else m.delete(eventId); return m; }); refreshCalendarWidget(); },
     search,
-  }), [ready, user, username, role, rsvps, avatar, filters, setFilters, from, originLabel, origin, dataVersion, signIn, signUp, loadFor, search]);
+  }), [ready, user, username, role, rsvps, avatar, filters, setFilters, from, originLabel, origin, dataVersion, signIn, signUp, loadFor, search, blocked, refreshBlocks]);
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

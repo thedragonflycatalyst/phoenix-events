@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/avatar';
+import { confirmBlock, confirmSuspend } from '@/components/safety';
 import { Heart, PersonPic } from '@/components/social';
 import { Icon, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
@@ -19,7 +20,7 @@ export default function CommentsSheet() {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { user, isMod } = useApp();
+  const { user, isMod, refreshBlocks } = useApp();
   const [items, setItems] = useState<Comment[] | null>(null);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -71,6 +72,8 @@ export default function CommentsSheet() {
     if (mine) buttons.push({ text: 'Delete', style: 'destructive', onPress: () => { deleteComment(c.id).then(load, (e) => toast(errText(e), false)); } });
     else if (isMod) buttons.push({ text: 'Remove (moderator)', style: 'destructive', onPress: () => { removeComment(c.id).then(() => { toast('Comment removed'); void load(); }, (e) => toast(errText(e), false)); } });
     if (!mine && user) buttons.push({ text: 'Report', onPress: () => { reportComment(c, user.id).then(() => toast('Report sent to moderators'), (e) => toast(errText(e), false)); } });
+    if (!mine && user) buttons.push({ text: `Block @${c.username ?? 'this person'}`, onPress: () => confirmBlock(c.user_id, c.username, toast, () => { refreshBlocks(); void load(); }) });
+    if (!mine && isMod) buttons.push({ text: 'Suspend account', style: 'destructive', onPress: () => confirmSuspend(c.username, toast, () => void load()) });
     buttons.push({ text: 'Cancel', style: 'cancel' });
     Alert.alert(`@${c.username ?? 'neighbor'}`, c.body.slice(0, 120), buttons);
   };

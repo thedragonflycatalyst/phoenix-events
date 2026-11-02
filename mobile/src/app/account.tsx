@@ -12,10 +12,11 @@ import {
 import { useApp } from '@/lib/app-state';
 import { fmtShort, fmtTime } from '@/lib/dates';
 import { errText } from '@/lib/model';
+import { blockedPeople, unblockUser } from '@/lib/safety';
 import { sb } from '@/lib/supabase';
 import { usePalette } from '@/lib/theme';
 
-type Open = null | 'email' | 'emailcode' | 'password' | 'username' | 'devices' | 'delete';
+type Open = null | 'email' | 'emailcode' | 'password' | 'username' | 'devices' | 'blocked' | 'delete';
 
 export default function Account() {
   const p = usePalette();
@@ -27,6 +28,8 @@ export default function Account() {
   const [pendingEmail, setPendingEmail] = useState('');
   const [devices, setDevices] = useState<DeviceSession[] | null>(null);
   const [mySession, setMySession] = useState<string | null>(null);
+  const [blocks, setBlocks] = useState<{ id: string; username: string | null }[] | null>(null);
+  const loadBlocks = () => { blockedPeople().then(setBlocks).catch(() => setBlocks([])); };
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const email = app.user?.email ?? '';
   const verified = !!app.user?.email_confirmed_at;
@@ -132,6 +135,20 @@ export default function Account() {
             <Button small kind="ghost" title="Sign out all other devices" style={{ marginTop: 8, alignSelf: 'flex-start' }}
               onPress={() => Alert.alert('Sign out other devices?', 'You’ll stay signed in on this phone.', [{ text: 'Cancel', style: 'cancel' },
                 { text: 'Sign out others', onPress: () => run('others', async () => { const { error } = await sb.auth.signOut({ scope: 'others' }); if (error) throw error; }, 'Other devices signed out', loadDevices) }])} />
+          </Panel>
+        )}
+      </Card>
+
+      <Card style={{ marginTop: 14, padding: 0 }}>
+        <Row icon="person" title="Blocked people" sub="People whose posts and comments you’ve hidden" onPress={() => { toggle('blocked'); if (open !== 'blocked') loadBlocks(); }} open={open === 'blocked'} last={open !== 'blocked'} />
+        {open === 'blocked' && (
+          <Panel last>
+            {blocks === null ? <ActivityIndicator /> : blocks.length === 0 ? <Txt v="small">You haven’t blocked anyone.</Txt> : blocks.map((b) => (
+              <View key={b.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 }}>
+                <Txt v="bold">@{b.username ?? 'unknown'}</Txt>
+                <Button small kind="quiet" title="Unblock" onPress={() => run('unblock', () => unblockUser(b.id), `@${b.username ?? 'They'} unblocked`, () => { loadBlocks(); app.refreshBlocks(); app.bump(); })} />
+              </View>
+            ))}
           </Panel>
         )}
       </Card>
