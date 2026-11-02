@@ -35,6 +35,10 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Check for the Play upload key
+        env:
+          K: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+        run: echo "HAS_UPLOAD_KEY=$([ -n "$K" ] && echo true || echo false)" >> "$GITHUB_ENV"
       - name: Install
         run: npm ci
 
@@ -57,6 +61,33 @@ jobs:
       - name: Build APK
         working-directory: mobile/android
         run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,x86_64 --no-daemon
+
+      # Google Play bundle, signed with the Phoenix upload key when the repository secrets are set
+      # (ANDROID_UPLOAD_KEYSTORE_B64, ANDROID_UPLOAD_STORE_PASSWORD, ANDROID_UPLOAD_KEY_ALIAS, ANDROID_UPLOAD_KEY_PASSWORD).
+      - name: Build Play Store bundle
+        if: env.HAS_UPLOAD_KEY == 'true'
+        working-directory: mobile/android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          STORE_PASS: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          ./gradlew bundleRelease --no-daemon
+          cp app/build/outputs/bundle/release/app-release.aab ../phoenix-community.aab
+          cd ..
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          # Replace the default debug signature with the upload key
+          zip -q -d phoenix-community.aab 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.EC' 'META-INF/*.DSA' 'META-INF/MANIFEST.MF' || true
+          jarsigner -keystore "$RUNNER_TEMP/upload.jks" -storepass "$STORE_PASS" -keypass "$KEY_PASS" -sigalg SHA256withRSA -digestalg SHA-256 phoenix-community.aab "$KEY_ALIAS"
+          jarsigner -verify phoenix-community.aab | tail -1
+          rm -f "$RUNNER_TEMP/upload.jks"
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_UPLOAD_KEY == 'true'
+        with:
+          name: play-bundle
+          path: mobile/phoenix-community.aab
+          retention-days: 30
 
       - name: Keep APK for the smoke test
         run: cp android/app/build/outputs/apk/release/app-release.apk phoenix-community.apk
