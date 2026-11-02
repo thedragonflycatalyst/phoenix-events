@@ -17,7 +17,7 @@ import { F, POSTER, R, usePalette } from '@/lib/theme';
 export default function About() {
   const p = usePalette();
   const insets = useSafeAreaInsets();
-  const { setFilters, user, role, rsvps } = useApp();
+  const { setFilters, user, role, rsvps, isAdmin } = useApp();
   const links = Object.entries(DONATE_LINKS).filter(([, u]) => u);
   const [shifts, setShifts] = useState<PEvent[]>([]);
   const [apps, setApps] = useState<Partial<Record<AppKind, Application>>>({});
@@ -29,12 +29,12 @@ export default function About() {
     void sb.from('phoenix_events').select('*').eq('is_tpc', true).eq('status', 'published').gte('starts_at', new Date().toISOString())
       .order('starts_at').limit(10).then(({ data }) => setShifts((data ?? []) as PEvent[]));
     if (user) void myApplications(user.id).then(setApps).catch(() => {});
-    if (role === 'admin') void pendingApplications().then((l) => setWaiting(l.length)).catch(() => {});
-  }, [user, role]));
+    if (isAdmin) void pendingApplications().then((l) => setWaiting(l.length)).catch(() => {});
+  }, [user, isAdmin]));
   const status = (k: AppKind) => {
     const a = apps[k];
-    if (k === 'organizer' && (role === 'organizer' || role === 'admin')) return 'You’re an organizer ✓';
-    if (k === 'moderator' && (role === 'moderator' || role === 'admin')) return 'You’re a moderator ✓';
+    if (k === 'organizer' && (role === 'organizer' || isAdmin)) return 'You’re an organizer ✓';
+    if (k === 'moderator' && (role === 'moderator' || isAdmin)) return 'You’re a moderator ✓';
     if (!a) return null;
     return a.status === 'pending' ? 'Application sent · waiting for review' : a.status === 'approved' ? 'Approved ✓' : 'Not approved this time';
   };
@@ -73,7 +73,7 @@ export default function About() {
             </Card>
           );
         })}
-        {role === 'admin' && (
+        {isAdmin && (
           <Button kind="quiet" icon="group" title={waiting ? `Review applications (${waiting})` : 'Review applications'} onPress={() => router.push('/applications')} />
         )}
       </View>

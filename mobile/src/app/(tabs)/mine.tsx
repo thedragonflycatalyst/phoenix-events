@@ -91,12 +91,12 @@ export default function Mine() {
       <SectionTitle>You posted</SectionTitle>
       {posted.length ? posted.map((e) => <Ticket key={e.id} e={e} />) : <Txt v="small">Events you add show up here.</Txt>}
 
-      {(app.isMod || app.role === 'admin') && (
+      {(app.isMod || app.isAdmin) && (
         <Card style={{ marginTop: 20, gap: 10 }}>
           <Txt v="h3">Team tools</Txt>
           {app.isMod && <Button kind="quiet" icon="shield_person" title="Review community posts" onPress={() => router.push('/moderate')} />}
-          {app.role === 'admin' && <Button kind="quiet" icon="group" title="Team roles" onPress={() => router.push('/admin')} />}
-          {app.role === 'admin' && <Button kind="quiet" icon="person" title="Review applications" onPress={() => router.push('/applications')} />}
+          {app.isAdmin && <Button kind="quiet" icon="group" title="Team roles" onPress={() => router.push('/admin')} />}
+          {app.isAdmin && <Button kind="quiet" icon="person" title="Review applications" onPress={() => router.push('/applications')} />}
         </Card>
       )}
       <Feeds />

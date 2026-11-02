@@ -17,7 +17,7 @@ export async function checkPendingApplications(): Promise<number> {
   const uid = auth.session?.user.id;
   if (!uid) return 0;
   const { data: me } = await sb.from('phoenix_roles').select('role').eq('user_id', uid).maybeSingle();
-  if (me?.role !== 'admin') return 0;
+  if (me?.role !== 'admin' && me?.role !== 'owner') return 0;
   const { data } = await sb.from('phoenix_applications').select('id,kind,username').eq('status', 'pending').order('created_at');
   const pending = (data ?? []) as { id: string; kind: AppKind; username: string | null }[];
   const seen = new Set(recall<string[]>(SEEN, []));

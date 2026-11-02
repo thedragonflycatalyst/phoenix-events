@@ -19,7 +19,7 @@ export default function ApplicationsScreen() {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const { role } = useApp();
+  const { isAdmin } = useApp();
   const [list, setList] = useState<Application[] | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export default function ApplicationsScreen() {
   const load = useCallback(() => { pendingApplications().then(setList).catch((e) => { toast(errText(e), false); setList([]); }); }, [toast]);
   useEffect(load, [load]);
 
-  if (role !== 'admin') return <View style={{ flex: 1, backgroundColor: p.bg, padding: 16 }}><Empty emoji="🔒" title="Admins only" /></View>;
+  if (!isAdmin) return <View style={{ flex: 1, backgroundColor: p.bg, padding: 16 }}><Empty emoji="🔒" title="Admins only" /></View>;
 
   const decide = async (a: Application, approve: boolean) => {
     setBusy(a.id + approve);

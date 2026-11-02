@@ -16,7 +16,7 @@ type Ctx = {
   ready: boolean; user: User | null; username: string | null; role: Role; rsvps: Map<string, RsvpKind>;
   /** Shared Dragonfly profile picture (same in every Dragonfly app) */
   avatar: string | null; refreshAvatar: () => Promise<void>;
-  isMod: boolean; canTpc: boolean;
+  isMod: boolean; canTpc: boolean; isAdmin: boolean;
   filters: Filters; setFilters: (f: Partial<Filters>) => void; activeFilterCount: number;
   origin: { lat: number; lng: number; mine: boolean } | null;
   /** Where distances are measured from, in words */
@@ -134,7 +134,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     ready, user, username, role, rsvps, avatar,
     refreshAvatar: async () => { setAvatar(user ? await avatarUrl(user.id) : null); },
-    isMod: role === 'admin' || role === 'moderator', canTpc: role === 'admin' || role === 'organizer',
+    isAdmin: role === 'admin' || role === 'owner',
+    isMod: role === 'owner' || role === 'admin' || role === 'moderator', canTpc: role === 'owner' || role === 'admin' || role === 'organizer',
     filters, setFilters,
     activeFilterCount: filters.cats.length + filters.tags.length + filters.cost.length + (filters.tpc ? 1 : 0) + (filters.q ? 1 : 0) + (filters.radius ? 1 : 0),
     origin: from, originLabel, dataVersion, bump: () => setDataVersion((v) => v + 1),

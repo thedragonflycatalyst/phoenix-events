@@ -21,13 +21,13 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Shell() {
   const p = usePalette();
-  const { ready, role, user } = useApp();
+  const { ready, isAdmin, user } = useApp();
   // Admins get a phone notification when new applications come in
-  useEffect(() => { if (ready) void setLeaderAlerts(role === 'admin'); }, [ready, role, user?.id]);
+  useEffect(() => { if (ready) void setLeaderAlerts(isAdmin); }, [ready, isAdmin, user?.id]);
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active' && role === 'admin') void checkPendingApplications(); });
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active' && isAdmin) void checkPendingApplications(); });
     return () => sub.remove();
-  }, [role]);
+  }, [isAdmin]);
   const [fontsLoaded] = useFonts({ BricolageGrotesque_700Bold, BricolageGrotesque_800ExtraBold, AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold });
 
   useEffect(() => { SystemUI.setBackgroundColorAsync(p.bg).catch(() => {}); }, [p.bg]);

@@ -135,7 +135,7 @@ export default function EventScreen() {
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
             {(mine || app.isMod) && <Button small kind="quiet" icon="edit" title="Edit" onPress={() => router.push({ pathname: '/edit/[id]', params: { id: e.id } })} />}
-            {(mine || app.role === 'admin') && <Button small kind="danger" icon="delete" title="Delete" onPress={del} />}
+            {(mine || app.isAdmin) && <Button small kind="danger" icon="delete" title="Delete" onPress={del} />}
             {!mine && <Button small kind="quiet" icon="flag" title="Report a problem" onPress={() => app.user ? setBusy('flag') : router.push('/sign-in')} />}
           </View>
           {busy === 'flag' && <FlagBox eventId={e.id} onDone={() => setBusy(null)} />}

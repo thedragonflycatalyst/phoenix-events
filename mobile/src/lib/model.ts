@@ -10,7 +10,7 @@ export type PEvent = {
   created_at: string; updated_at: string;
 };
 export type RsvpKind = 'going' | 'volunteer';
-export type Role = 'admin' | 'organizer' | 'moderator' | null;
+export type Role = 'owner' | 'admin' | 'organizer' | 'moderator' | null;
 
 export const CATS: { key: Cat; label: string; emoji: string; pillar?: string; blurb?: string }[] = [
   { key: 'environmental', label: 'Environmental', emoji: '🌿', pillar: 'Environmental Well-Being', blurb: 'Cleanups, tree planting, trail care and nature outings that keep our shared spaces beautiful.' },
@@ -41,6 +41,8 @@ export const PAYPAL_DONATE = '';
 
 const FRIENDLY: Record<string, string> = {
   resume_too_big: 'That file is over 10 MB. Try a PDF version.',
+  phoenix_owner_locked: 'The owner’s role can’t be changed.',
+  phoenix_owner_only: 'Only the owner can make or remove admins.',
   phoenix_applications_one_open: 'You already have an application waiting for review.',
   phoenix_application_closed: 'That application was already reviewed.',
   phoenix_tpc_claim: 'Only Phoenix Catalyst leaders can post events hosted by The Phoenix Catalyst. Remove that from the host, name or description.',

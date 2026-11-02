@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=15';
-import { readPoster, compressImage } from './ocr.js?v=15';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=16';
+import { readPoster, compressImage } from './ocr.js?v=16';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -33,8 +33,9 @@ const state = {
 const $ = (sel, root = document) => root.querySelector(sel);
 const h = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const main = () => $('#main');
-const isMod = () => ['admin', 'moderator'].includes(state.role);
-const canTpc = () => ['admin', 'organizer'].includes(state.role);
+const isAdmin = () => ['owner', 'admin'].includes(state.role);
+const isMod = () => ['owner', 'admin', 'moderator'].includes(state.role);
+const canTpc = () => ['owner', 'admin', 'organizer'].includes(state.role);
 function firstOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
 function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
 function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
@@ -59,6 +60,8 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3600);
 }
 const FRIENDLY = {
+  phoenix_owner_locked: 'The owner’s role can’t be changed.',
+  phoenix_owner_only: 'Only the owner can make or remove admins.',
   phoenix_tpc_claim: 'Only Phoenix Catalyst leaders can post events hosted by The Phoenix Catalyst. Remove that from the host, name or description.',
   phoenix_applications_one_open: 'You already have an application waiting for review.',
   phoenix_application_closed: 'That application was already reviewed.',
@@ -195,7 +198,7 @@ function accountDialog() {
     <div class="row" style="justify-content:center">
       <a class="btn small quiet" href="#/mine" data-close>My events</a>
       ${isMod() ? '<a class="btn small quiet" href="#/moderate" data-close>Review posts</a>' : ''}
-      ${state.role === 'admin' ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a><a class="btn small quiet" href="#/applications" data-close>Applications</a>' : ''}
+      ${isAdmin() ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a><a class="btn small quiet" href="#/applications" data-close>Applications</a>' : ''}
       <button class="btn small ghost" id="signout" type="button">Sign out</button>
     </div>
     <p class="small muted" style="text-align:center;margin-top:12px">Signed-in devices, data export and account deletion are in the Phoenix and Uploader apps.</p>`, (d) => {
@@ -820,7 +823,7 @@ async function viewEvent(id) {
     <p class="small muted">Posted by @${h(e.created_by_username || 'neighbor')}${e.source === 'poster' ? ' from a poster photo' : ''}. Details can change, so check with the organizer.</p>
     <div class="actions">
       ${mine || isMod() ? `<a class="btn small quiet" href="#/edit/${e.id}">Edit</a>` : ''}
-      ${mine || state.role === 'admin' ? '<button class="btn small danger" id="del">Delete</button>' : ''}
+      ${mine || isAdmin() ? '<button class="btn small danger" id="del">Delete</button>' : ''}
       ${!mine ? '<button class="btn small quiet" id="flag">Report a problem</button>' : ''}
     </div>
     ${isMod() ? `<div class="panel"><h3>Moderation</h3><p class="small muted">${e.reviewed_at ? `Reviewed ${h(fmtShort(e.reviewed_at))}` : 'Not reviewed yet'}. Status: ${h(e.status)}.</p>
@@ -1155,7 +1158,7 @@ async function viewMine() {
     <h2 style="margin:20px 0 10px">Events you posted</h2>
     ${(posted.data || []).length ? posted.data.map(evRow).join('') : '<p class="muted">You haven’t posted any events yet. <a href="#/add">Add one</a>.</p>'}
     ${isMod() ? '<p style="margin-top:16px"><a class="btn quiet" href="#/moderate">Review community posts</a></p>' : ''}
-    ${state.role === 'admin' ? '<p><a class="btn quiet" href="#/applications">Review applications</a></p>' : ''}
+    ${isAdmin() ? '<p><a class="btn quiet" href="#/applications">Review applications</a></p>' : ''}
     ${publicFeeds}</div>`;
   wireCopy(root);
   $('#rotate')?.addEventListener('click', async () => {
@@ -1201,17 +1204,30 @@ async function viewModerate() {
 
 async function viewAdmin() {
   const root = main();
-  if (state.role !== 'admin') { root.innerHTML = '<div class="empty detail"><h2>Admins only</h2></div>'; return; }
+  if (!isAdmin()) { root.innerHTML = '<div class="empty detail"><h2>Admins only</h2></div>'; return; }
+  const owner = state.role === 'owner';
   const { data, error } = await sb.rpc('phoenix_list_roles');
+  const LABEL = { owner: 'Owner', admin: 'Admin', organizer: 'Organizer', moderator: 'Moderator', none: 'No role' };
+  const opts = owner ? ['moderator', 'organizer', 'admin', 'none'] : ['moderator', 'organizer', 'none'];
   root.innerHTML = `<div class="detail"><h1>Team roles</h1>
-    <p class="muted" style="margin-top:8px">Moderators review community posts. Organizers post official volunteer events and see volunteer lists. Admins can do everything.</p>
-    <div class="panel"><form id="rolef" class="row"><input type="text" name="u" placeholder="Username" required style="flex:1;min-width:160px" autocapitalize="none">
-      <select name="r" style="width:auto"><option value="moderator">Moderator</option><option value="organizer">Organizer</option><option value="admin">Admin</option><option value="none">No role</option></select>
+    <p class="muted" style="margin-top:8px">${owner ? 'You’re the owner. You can make people moderators, organizers or admins. Nobody can change your role.' : 'You can make people moderators or organizers. Only the owner can make or remove admins.'}</p>
+    <p class="muted">Moderators review posts, reports and comments. Organizers post official Phoenix events and see volunteer lists. Admins can also give roles and review applications.</p>
+    <div class="panel"><form id="rolef" class="row"><input type="text" name="u" placeholder="Username" required style="flex:1;min-width:160px" autocapitalize="none" list="people" autocomplete="off">
+      <datalist id="people"></datalist>
+      <select name="r" style="width:auto">${opts.map((k) => `<option value="${k}">${LABEL[k]}</option>`).join('')}</select>
       <button class="btn" type="submit">Save role</button></form><p class="error" id="roleerr" role="alert"></p></div>
-    ${error ? `<p class="error">${h(errText(error))}</p>` : `<ul class="list-plain">${data.map((r) => `<li>@${h(r.username)} · ${h(r.role)}</li>`).join('')}</ul>`}</div>`;
-  $('#rolef').addEventListener('submit', async (ev) => {
+    ${error ? `<p class="error">${h(errText(error))}</p>` : `<ul class="list-plain">${data.map((r) => `<li>@${h(r.username)} · <b>${h(LABEL[r.role] ?? r.role)}</b>${r.role !== 'owner' && (owner || r.role !== 'admin') ? ` <button class="btn small quiet" data-pick="${h(r.username)}">Change</button>` : ''}</li>`).join('')}</ul>`}</div>`;
+  const form = $('#rolef');
+  form.u.addEventListener('input', async () => {
+    const q = form.u.value.trim().replace(/^@/, '');
+    if (q.length < 2) return;
+    const { data: ppl } = await sb.rpc('phoenix_find_people', { p_query: q });
+    $('#people').innerHTML = (ppl ?? []).map((x) => `<option value="${h(x.username)}">${h(LABEL[x.role] ?? x.role)}</option>`).join('');
+  });
+  root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { form.u.value = b.dataset.pick; form.r.focus(); }));
+  form.addEventListener('submit', async (ev) => {
     ev.preventDefault();
-    const { error: e2 } = await sb.rpc('phoenix_set_role', { p_username: ev.target.u.value.trim(), p_role: ev.target.r.value });
+    const { error: e2 } = await sb.rpc('phoenix_set_role', { p_username: form.u.value.trim().replace(/^@/, ''), p_role: form.r.value });
     if (e2) $('#roleerr').textContent = errText(e2); else { toast('Role saved'); viewAdmin(); }
   });
 }
@@ -1334,7 +1350,7 @@ const showAnswer = (v) => (Array.isArray(v) ? v.join(', ') : typeof v === 'boole
 
 async function viewApplications() {
   const root = main();
-  if (state.role !== 'admin') { root.innerHTML = '<div class="empty detail"><h2>Admins only</h2></div>'; return; }
+  if (!isAdmin()) { root.innerHTML = '<div class="empty detail"><h2>Admins only</h2></div>'; return; }
   root.innerHTML = '<p class="muted pad">Loading…</p>';
   const { data, error } = await sb.from('phoenix_applications').select('*').eq('status', 'pending').order('created_at', { ascending: true });
   if (error) { root.innerHTML = `<div class="empty detail"><p class="error">${h(errText(error))}</p></div>`; return; }
@@ -1397,7 +1413,7 @@ async function viewAbout() {
   const [{ data: ev }, apps, pending] = await Promise.all([
     sb.from('phoenix_events').select('*').eq('is_tpc', true).eq('status', 'published').gte('starts_at', new Date().toISOString()).order('starts_at').limit(10),
     myApplications(),
-    state.role === 'admin' ? sb.from('phoenix_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending') : Promise.resolve({ count: 0 }),
+    isAdmin() ? sb.from('phoenix_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending') : Promise.resolve({ count: 0 }),
   ]);
   if (!$('#volrail')) return; // navigated away
   $('#volrail').innerHTML = ev?.length ? `<div class="rail">${ev.map(tile).join('')}</div>`
@@ -1407,7 +1423,7 @@ async function viewAbout() {
     const done = st && !st.startsWith('Not');
     return `<div class="panel gi"><span class="e" aria-hidden="true">${info.emoji}</span><div><h3>${h(info.title)}</h3><p class="small muted" style="margin:0">${h(st || info.blurb)}</p></div>
       ${done ? '' : `<a class="btn small" href="#/apply/${k}" aria-label="Apply: ${h(info.title)}">Apply</a>`}</div>`;
-  }).join('') + (state.role === 'admin' ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '');
+  }).join('') + (isAdmin() ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '');
 }
 
 /* ---------- router ---------- */
