@@ -146,8 +146,7 @@ function parseIcs(body: string, base_: string): Item[] {
         const base: Item = {
           uid, title: un(ev.SUMMARY.v), description: clip(text(un(ev.DESCRIPTION?.v ?? "")), 4000) || null,
           starts_at: st.iso, ends_at: en && !st.allDay ? en.iso : null, all_day: st.allDay,
-          location_name: ev.LOCATION ? clip(un(ev.LOCATION.v).split(/\n|, (?=\d)/)[0], 200) : null,
-          address: ev.LOCATION ? clip(un(ev.LOCATION.v).replace(/\n/g, ", "), 300) : null,
+          ...place(ev.LOCATION ? un(ev.LOCATION.v) : null),
           url: ev.URL?.v ? new URL(ev.URL.v, base_).href : null,
           cost: costType === "free" ? "free" : costType === "paid" ? "paid" : undefined,
         };
@@ -171,6 +170,27 @@ function parseIcs(body: string, base_: string): Item[] {
     ev[name.toUpperCase()] = { v: line.slice(i + 1), p: ps.join(";") };
   }
   return out;
+}
+
+// "Columbia Ice Rink @ 5876 Thunder Hill Road, Columbia" or "Hall\n12 Main St" → venue name + street address
+function place(loc: string | null) {
+  if (!loc?.trim()) return { location_name: null, address: null };
+  const parts = loc.split(/\s+@\s+|\n/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length > 1) return { location_name: clip(parts[0], 200), address: clip(parts.slice(1).join(", "), 300) };
+  const m = loc.match(/^([^,\d][^,]*?),\s*(\d.*)$/);
+  return m ? { location_name: clip(m[1], 200), address: clip(m[2], 300) } : { location_name: clip(loc, 200), address: /\d/.test(loc) ? clip(loc, 300) : null };
+}
+
+// Map pins: US Census geocoder (free, no key). One lookup per distinct address per run.
+async function geocode(items: Item[]) {
+  const want = [...new Set(items.filter((i) => i.lat == null && i.address && /\d/.test(i.address)).map((i) => i.address!))].slice(0, 30);
+  const found = new Map<string, { lat: number; lng: number }>();
+  await Promise.all(want.map(async (a) => {
+    const r = await get(`https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=json&address=${encodeURIComponent(a)}`, "application/json");
+    try { const c = JSON.parse(r?.body ?? "{}").result?.addressMatches?.[0]?.coordinates; if (c) found.set(a, { lat: c.y, lng: c.x }); } catch { /* no match */ }
+  }));
+  for (const i of items) { const c = i.address ? found.get(i.address) : undefined; if (c && i.lat == null) { i.lat = c.lat; i.lng = c.lng; } }
+  return items;
 }
 
 // ---------- The Events Calendar (WordPress) ----------
@@ -318,7 +338,7 @@ Deno.serve(async (req) => {
   for (const s of sources ?? []) {
     try {
       const { items, method } = await read(s.website, s.feed_url);
-      const list = upcoming(items);
+      const list = await geocode(upcoming(items));
       const { data, error: e } = await admin.rpc("phoenix_import_events", { p_source: s.id, p_items: list, p_method: method });
       if (e) throw new Error(e.message);
       results.push({ source: s.name, method, found: list.length, ...(data as object) });

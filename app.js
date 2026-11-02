@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=21';
-import { readPoster, compressImage } from './ocr.js?v=21';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=22';
+import { readPoster, compressImage } from './ocr.js?v=22';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -1559,7 +1559,7 @@ async function viewSources() {
   main().innerHTML = `<div class="detail"><h1>Local organizations</h1>
     <p>We bring in events from local organizations’ own calendars automatically, so you don’t have to check a dozen websites.</p>
     <form class="panel" id="srcf" novalidate><h2>${leader ? 'Add an organization' : 'Suggest an organization'}</h2>
-      <label class="field"><span>Organization</span><input name="name" maxlength="120" placeholder="Howard County Library" required></label>
+      <label class="field"><span>Organization</span><input type="text" name="name" maxlength="120" placeholder="Howard County Library" required></label>
       <label class="field"><span>Their events page</span><input name="website" type="url" maxlength="500" placeholder="https://…/events" required></label>
       <label class="field"><span>Calendar feed link <span class="muted small">(optional, iCal or “Add to calendar” link)</span></span><input name="feed" type="url" maxlength="500"></label>
       <label class="field"><span>Why they’re a good fit <span class="muted small">(optional)</span></span><textarea name="note" maxlength="1000"></textarea></label>

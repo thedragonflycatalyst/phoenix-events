@@ -361,3 +361,4 @@ input[type=file] { max-width: 100%; min-height: 44px; }
 .give input[type=radio]:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
 .give #custwrap { margin-top: 10px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.give #custwrap[hidden] { display: none; }
