@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=16';
-import { readPoster, compressImage } from './ocr.js?v=16';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=17';
+import { readPoster, compressImage } from './ocr.js?v=17';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -822,7 +822,7 @@ async function viewEvent(id) {
       <a class="btn quiet" href="#comments" id="tocomments"><span aria-hidden="true">💬</span> <span id="cc">0</span> comments</a></div>` : ''}
     <p class="small muted">Posted by @${h(e.created_by_username || 'neighbor')}${e.source === 'poster' ? ' from a poster photo' : ''}. Details can change, so check with the organizer.</p>
     <div class="actions">
-      ${mine || isMod() ? `<a class="btn small quiet" href="#/edit/${e.id}">Edit</a>` : ''}
+      ${mine || isMod() || (e.is_tpc && canTpc()) ? `<a class="btn small quiet" href="#/edit/${e.id}">Edit</a>` : ''}
       ${mine || isAdmin() ? '<button class="btn small danger" id="del">Delete</button>' : ''}
       ${!mine ? '<button class="btn small quiet" id="flag">Report a problem</button>' : ''}
     </div>
@@ -1084,7 +1084,7 @@ async function viewAdd() {
 async function viewEdit(id) {
   if (!requireUser('Sign in to edit events.')) { location.hash = '#/'; return; }
   const { data: e } = await sb.from('phoenix_events').select('*').eq('id', id).maybeSingle();
-  if (!e || (e.created_by !== state.user.id && !isMod())) { main().innerHTML = '<div class="empty detail"><h2>You can’t edit this event</h2><a class="btn" href="#/">Back to calendar</a></div>'; return; }
+  if (!e || (e.created_by !== state.user.id && !isMod() && !(e.is_tpc && canTpc()))) { main().innerHTML = '<div class="empty detail"><h2>You can’t edit this event</h2><a class="btn" href="#/">Back to calendar</a></div>'; return; }
   main().innerHTML = `<div class="detail"><h1>Edit event</h1>${eventForm(e)}</div>`;
   wireEventForm(e);
 }
