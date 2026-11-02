@@ -72,6 +72,10 @@ async function scaleImage(file, factor) {
   return new Promise((res) => c.toBlob(res, 'image/png'));
 }
 
+// "Hosted by X" / "Presented by X" / "X presents" name the organizer
+const HOST = /\b(?:hosted|presented|organi[sz]ed|sponsored|brought to you)\s+by:?\s+(.{3,80})$/i;
+const PRESENTS = /^(.{3,60}?)\s+presents?:?$/i;
+
 export function parsePoster(data, chrono) {
   const text = (data.text || '').replace(/[|_~]{2,}/g, ' ').replace(/[ \t]+/g, ' ').trim();
   const lines = (data.lines || []).map((l) => ({
@@ -80,7 +84,7 @@ export function parsePoster(data, chrono) {
     conf: l.confidence ?? 0,
   })).filter((l) => (l.text.match(/[A-Za-z]/g) || []).length >= 3 && l.conf > 40);
 
-  const found = { title: '', start: null, end: null, allDay: false, location_name: '', address: '', url: '', cost: 'free', category: 'community', description: '' };
+  const found = { title: '', start: null, end: null, allDay: false, location_name: '', address: '', url: '', organizer: '', cost: 'free', category: 'community', description: '' };
 
   // Dates and times
   const ref = new Date();
@@ -110,7 +114,7 @@ export function parsePoster(data, chrono) {
   const used = new Set();
   const dateText = (chrono.strict ?? chrono).parse(dateish, ref).map((r) => r.text.toLowerCase());
   const isDateLine = (t) => dateText.some((d) => t.toLowerCase().includes(d) || d.includes(t.toLowerCase())) || (chrono.strict ?? chrono).parse(t, ref).length > 0;
-  const candidates = lines.filter((l) => !isDateLine(l.text) && !ADDRESS.test(l.text) && l.text.length <= 80);
+  const candidates = lines.filter((l) => !isDateLine(l.text) && !ADDRESS.test(l.text) && !HOST.test(l.text) && !PRESENTS.test(l.text) && l.text.length <= 80);
   candidates.sort((a, b) => b.h - a.h);
   if (candidates[0]) {
     // Join a second line of the same size ("HAUNTED" / "TRAIL")
@@ -127,10 +131,12 @@ export function parsePoster(data, chrono) {
   // Place
   const addr = text.match(ADDRESS);
   if (addr) found.address = tidy(addr[0]);
-  const venue = lines.find((l) => !used.has(l) && VENUE.test(l.text) && !ADDRESS.test(l.text) && !isDateLine(l.text));
+  const venue = lines.find((l) => !used.has(l) && VENUE.test(l.text) && !ADDRESS.test(l.text) && !isDateLine(l.text) && !HOST.test(l.text));
   if (venue) found.location_name = tidy(venue.text).replace(/^(at|@|location:?|where:?)\s+/i, '').slice(0, 200);
 
   const url = text.match(/\b(?:https?:\/\/|www\.)[^\s]+/i);
+  const host = lines.map((l) => l.text.trim().match(HOST)).find(Boolean) ?? lines.map((l) => l.text.trim().match(PRESENTS)).find(Boolean);
+  if (host) found.organizer = tidy(host[1]).slice(0, 140);
   if (url) found.url = (url[0].startsWith('http') ? url[0] : `https://${url[0]}`).replace(/[.,;)]+$/, '');
   if (/\b(donation|suggested|pay what you can)\b/i.test(text)) found.cost = 'donation';
   else if (/\$\s?\d/.test(text) && !/\bfree\b/i.test(text)) found.cost = 'paid';

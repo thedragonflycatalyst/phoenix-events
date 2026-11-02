@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=17';
-import { readPoster, compressImage } from './ocr.js?v=17';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=18';
+import { readPoster, compressImage } from './ocr.js?v=18';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -26,7 +26,7 @@ const RADII = [[null, 'Any distance'], [2, 'Within 2 mi'], [5, 'Within 5 mi'], [
 const state = {
   user: null, username: null, role: null,
   month: firstOfMonth(new Date()), day: null,
-  filters: loadFilters(), loc: null, rsvps: new Map(),
+  filters: loadFilters(), loc: null, rsvps: new Map(), blocked: new Set(),
 };
 
 /* ---------- small helpers ---------- */
@@ -60,6 +60,9 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3600);
 }
 const FRIENDLY = {
+  phoenix_banned: 'Your account can’t post, comment or RSVP right now because a moderator suspended it. Reply to any Phoenix email if you think this is a mistake.',
+  phoenix_cannot_ban_leader: 'Leaders can only be suspended by someone above them, and the owner can’t be suspended.',
+  phoenix_cannot_ban_self: 'You can’t suspend yourself.',
   phoenix_owner_locked: 'The owner’s role can’t be changed.',
   phoenix_owner_only: 'Only the owner can make or remove admins.',
   phoenix_tpc_claim: 'Only Phoenix Catalyst leaders can post events hosted by The Phoenix Catalyst. Remove that from the host, name or description.',
@@ -115,11 +118,40 @@ function confirmDialog(title, body, okLabel = 'Confirm', danger = false) {
   });
 }
 
+/* ---------- safety: blocking and suspending ---------- */
+async function loadBlocks() {
+  if (!state.user) { state.blocked = new Set(); return; }
+  const { data } = await sb.from('phoenix_blocks').select('blocked');
+  state.blocked = new Set((data || []).map((r) => r.blocked));
+}
+const notBlocked = (list) => (list || []).filter((e) => !state.blocked?.has(e.created_by));
+async function blockPerson(userId, username, done) {
+  const name = `@${username || 'this person'}`;
+  if (!(await confirmDialog(`Block ${name}?`, 'You won’t see their posts or comments anymore. They aren’t told. You can unblock them from your account.', 'Block', true))) return;
+  const { error } = await sb.from('phoenix_blocks').insert({ blocked: userId });
+  if (error && !/duplicate key/.test(error.message)) return toast(errText(error));
+  state.blocked.add(userId); toast(`${name} blocked`); done?.();
+}
+function suspendDialog(username, done) {
+  if (!username) return;
+  openDialog(`<h2>Suspend @${h(username)}?</h2>
+    <p>They won’t be able to post, comment, RSVP, report or apply, and their current posts and comments are hidden. You can lift it from Review posts.</p>
+    <div class="row"><button class="btn small" data-days="7">7 days</button><button class="btn small" data-days="30">30 days</button><button class="btn small danger" data-days="">Until lifted</button><button class="btn small ghost" data-close>Cancel</button></div>`, (d) => {
+    d.querySelectorAll('[data-days]').forEach((b) => b.addEventListener('click', async () => {
+      const days = b.dataset.days ? Number(b.dataset.days) : null;
+      const { error } = await sb.rpc('phoenix_ban_user', { p_username: username, p_reason: 'Broke the community guidelines', p_days: days, p_hide_content: true });
+      d.close();
+      if (error) return toast(errText(error));
+      toast(`@${username} suspended${days ? ` for ${days} days` : ''}. Their posts and comments are hidden.`); done?.();
+    }));
+  });
+}
+
 /* ---------- accounts (shared Dragonfly account system) ---------- */
 async function loadMe() {
   const { data: { session } } = await sb.auth.getSession();
   state.user = session?.user ?? null;
-  state.username = null; state.role = null; state.rsvps = new Map(); state.avatar = null;
+  state.username = null; state.role = null; state.rsvps = new Map(); state.avatar = null; state.blocked = new Set();
   if (state.user) {
     const [p, r, rs] = await Promise.all([
       sb.from('dragonfly_profiles').select('username').eq('user_id', state.user.id).maybeSingle(),
@@ -130,6 +162,7 @@ async function loadMe() {
     state.avatar = await avatarUrl(state.user.id);
     state.role = r.data?.role ?? null;
     (rs.data ?? []).forEach((x) => state.rsvps.set(x.event_id, x.kind));
+    await loadBlocks();
   }
   renderAccount();
 }
@@ -201,7 +234,22 @@ function accountDialog() {
       ${isAdmin() ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a><a class="btn small quiet" href="#/applications" data-close>Applications</a>' : ''}
       <button class="btn small ghost" id="signout" type="button">Sign out</button>
     </div>
+    <details class="panel" id="blockedwrap"><summary><b>Blocked people</b></summary><div id="blockedlist" class="small muted">Loading…</div></details>
     <p class="small muted" style="text-align:center;margin-top:12px">Signed-in devices, data export and account deletion are in the Phoenix and Uploader apps.</p>`, (d) => {
+    const paintBlocked = async () => {
+      const box = $('#blockedlist', d);
+      const ids = [...(state.blocked || [])];
+      if (!ids.length) { box.textContent = 'You haven’t blocked anyone.'; return; }
+      const { data } = await sb.from('dragonfly_profiles').select('user_id,username').in('user_id', ids);
+      const names = new Map((data || []).map((x) => [x.user_id, x.username]));
+      box.innerHTML = ids.map((id) => `<div class="row" style="justify-content:space-between;align-items:center"><b>@${h(names.get(id) || 'unknown')}</b><button type="button" class="btn small quiet" data-unblock="${id}">Unblock</button></div>`).join('');
+      box.querySelectorAll('[data-unblock]').forEach((b) => b.onclick = async () => {
+        const { error } = await sb.from('phoenix_blocks').delete().eq('blocked', b.dataset.unblock);
+        if (error) return toast(errText(error));
+        state.blocked.delete(b.dataset.unblock); toast('Unblocked'); paintBlocked(); route();
+      });
+    };
+    $('#blockedwrap', d).addEventListener('toggle', (ev) => { if (ev.target.open) paintBlocked(); });
     const err = $('#accterr', d), form = $('#acctf', d);
     const fail = (e) => { err.textContent = errText(e); };
     const pick = () => $('#picfile', d).click();
@@ -390,7 +438,8 @@ async function search(from, to, limit = 300) {
     p_lat: o?.lat ?? null, p_lng: o?.lng ?? null, p_radius_mi: f.radius ?? null, p_limit: limit,
   });
   if (error) throw error;
-  return data;
+  // Hide posts from people you've blocked
+  return notBlocked(data);
 }
 function activeFilterCount() {
   const f = state.filters;
@@ -713,7 +762,7 @@ async function wireSocial(e) {
     return `<li class="cmt${reply ? ' reply' : ''}">${pfp(c.user_id, c.username, reply ? 26 : 34)}<div class="cbody">
       <div class="cmeta"><b>@${h(c.username || 'neighbor')}</b>${mine ? ' · you' : ''} <span class="muted">· ${h(timeAgo(c.created_at))}</span></div>
       <p>${h(c.body)}</p>
-      <div class="cacts"><button type="button" class="linkbtn" data-reply="${c.id}">Reply</button>${mine ? `<button type="button" class="linkbtn" data-del="${c.id}">Delete</button>` : isMod() ? `<button type="button" class="linkbtn" data-rm="${c.id}">Remove</button>` : ''}${state.user && !mine ? `<button type="button" class="linkbtn" data-report="${c.id}">Report</button>` : ''}</div></div>
+      <div class="cacts"><button type="button" class="linkbtn" data-reply="${c.id}">Reply</button>${mine ? `<button type="button" class="linkbtn" data-del="${c.id}">Delete</button>` : isMod() ? `<button type="button" class="linkbtn" data-rm="${c.id}">Remove</button>` : ''}${state.user && !mine ? `<button type="button" class="linkbtn" data-report="${c.id}">Report</button><button type="button" class="linkbtn" data-block="${c.id}">Block</button>` : ''}${!mine && isMod() ? `<button type="button" class="linkbtn danger" data-ban="${c.id}">Suspend</button>` : ''}</div></div>
       <button type="button" class="cheart" data-like="${c.id}" aria-pressed="${on}" aria-label="${on ? 'Unlike' : 'Like'} comment, ${c.like_count} hearts"><span class="heart">♥</span><span>${c.like_count ? compact(c.like_count) : ''}</span></button></li>`;
   };
   const paint = () => {
@@ -741,7 +790,7 @@ async function wireSocial(e) {
     const b = ev.target.closest('button'); if (!b) return;
     const d = b.dataset;
     if (d.open) { open.add(d.open); paint(); return; }
-    const c = items.find((x) => x.id === (d.like || d.reply || d.del || d.rm || d.report)); if (!c) return;
+    const c = items.find((x) => x.id === (d.like || d.reply || d.del || d.rm || d.report || d.block || d.ban)); if (!c) return;
     if (d.like) {
       if (!requireUser('Sign in to heart comments.')) return;
       const like = !liked.has(c.id);
@@ -765,6 +814,10 @@ async function wireSocial(e) {
       if (!(await confirmDialog('Remove this comment?', 'It and its replies will be hidden from everyone.', 'Remove', true))) return;
       const { error } = await sb.rpc('phoenix_remove_comment', { p_comment: c.id });
       if (error) toast(errText(error)); else { toast('Comment removed'); load(); }
+    } else if (d.block) {
+      await blockPerson(c.user_id, c.username, load);
+    } else if (d.ban) {
+      suspendDialog(c.username, load);
     } else if (d.report) {
       const { error } = await sb.from('phoenix_flags').insert({ event_id: e.id, user_id: state.user.id, reason: `Comment by @${c.username || 'neighbor'}: “${c.body.slice(0, 300)}”` });
       toast(error ? (/duplicate/.test(error.message) ? 'You already reported this event. Moderators will review it.' : errText(error)) : 'Report sent to moderators');
@@ -825,6 +878,8 @@ async function viewEvent(id) {
       ${mine || isMod() || (e.is_tpc && canTpc()) ? `<a class="btn small quiet" href="#/edit/${e.id}">Edit</a>` : ''}
       ${mine || isAdmin() ? '<button class="btn small danger" id="del">Delete</button>' : ''}
       ${!mine ? '<button class="btn small quiet" id="flag">Report a problem</button>' : ''}
+      ${!mine && state.user ? '<button class="btn small quiet" id="blockposter">Block poster</button>' : ''}
+      ${!mine && isMod() ? '<button class="btn small danger" id="banposter">Suspend poster</button>' : ''}
     </div>
     ${isMod() ? `<div class="panel"><h3>Moderation</h3><p class="small muted">${e.reviewed_at ? `Reviewed ${h(fmtShort(e.reviewed_at))}` : 'Not reviewed yet'}. Status: ${h(e.status)}.</p>
       <div class="row">
@@ -872,6 +927,8 @@ async function viewEvent(id) {
     if (e.poster_path) await sb.storage.from('phoenix-posters').remove([e.poster_path]);
     toast('Event deleted'); location.hash = '#/';
   });
+  $('#blockposter')?.addEventListener('click', () => blockPerson(e.created_by, e.created_by_username, () => { location.hash = '#/'; }));
+  $('#banposter')?.addEventListener('click', () => suspendDialog(e.created_by_username, () => viewEvent(e.id)));
   $('#flag')?.addEventListener('click', () => {
     if (!requireUser('Sign in to report a problem.')) return;
     openDialog(`<h2>Report a problem</h2><form id="flagf"><label class="field"><span>What’s wrong?</span>
@@ -1068,7 +1125,7 @@ async function viewAdd() {
       found = await readPoster(poster, (p) => { const pr = $('#prog'); if (pr) pr.value = p; });
     } catch (e) { toast(errText(e)); }
     const pre = {
-      title: found.title, category: found.category, location_name: found.location_name, address: found.address, url: found.url, cost: found.cost,
+      title: found.title, category: found.category, location_name: found.location_name, address: found.address, url: found.url, cost: found.cost, organizer: found.organizer || '',
       description: found.description, all_day: !!found.allDay,
       starts_at: found.start ? found.start.toISOString() : null, ends_at: found.end ? found.end.toISOString() : null,
     };
@@ -1173,9 +1230,10 @@ async function viewModerate() {
   const root = main();
   if (!isMod()) { root.innerHTML = '<div class="empty detail"><h2>For volunteer moderators</h2><p>Ask a Phoenix Catalyst admin if you’d like to help review posts.</p></div>'; return; }
   root.innerHTML = '<p class="muted pad">Loading…</p>';
-  const [q, flags] = await Promise.all([
+  const [q, flags, bans] = await Promise.all([
     sb.from('phoenix_events').select('*').is('reviewed_at', null).order('created_at', { ascending: false }).limit(100),
     sb.rpc('phoenix_open_flags'),
+    sb.rpc('phoenix_list_bans'),
   ]);
   root.innerHTML = `<div class="detail"><h1>Review posts</h1>
     <p class="muted" style="margin-top:8px">Community posts go live right away. Check that each one is real, local, and kind. Hide anything unclear and remove spam or harmful posts.</p>
@@ -1183,11 +1241,20 @@ async function viewModerate() {
     ${(flags.data || []).length ? `<ul class="list-plain">${flags.data.map((f) => `<li><a href="#/event/${f.event_id}"><b>${h(f.title)}</b></a>
       <br><span class="small">“${h(f.reason)}” by @${h(f.flagged_by || 'unknown')}, ${h(fmtShort(f.created_at))}</span>
       <br><button class="btn small quiet" data-resolve="${f.flag_id}">Mark handled</button></li>`).join('')}</ul>` : '<p class="muted">No open reports.</p>'}
+    <h2 style="margin:20px 0 10px">Suspended accounts (${(bans.data || []).length})</h2>
+    ${(bans.data || []).length ? `<ul class="list-plain">${bans.data.map((b) => `<li><b>@${h(b.username || 'unknown')}</b> <span class="small muted">${b.until ? `until ${h(fmtShort(b.until))}` : 'until lifted'}${b.reason ? ` · ${h(b.reason)}` : ''}</span> <button class="btn small quiet" data-lift="${h(b.username || '')}">Lift</button></li>`).join('')}</ul>` : '<p class="muted">No one is suspended.</p>'}
+    <form id="banf" class="row"><input type="text" name="u" placeholder="Username" autocapitalize="none" required style="flex:1;min-width:160px"><button class="btn small danger" type="submit">Suspend</button></form>
+    <p class="small muted">Suspended people can still read the calendar but can’t post, comment, RSVP, report or apply.</p>
     <h2 style="margin:20px 0 10px">Not reviewed yet (${(q.data || []).length})</h2>
     ${(q.data || []).length ? q.data.map((e) => `${evRow(e)}<div class="row" style="margin:-2px 0 14px">
       <button class="btn small" data-ok="${e.id}">Looks good</button><button class="btn small quiet" data-st="${e.id}" data-v="hidden">Hide</button>
       <button class="btn small danger" data-st="${e.id}" data-v="removed">Remove</button><span class="small muted">by @${h(e.created_by_username || '?')}${e.status !== 'published' ? ` · ${h(e.status)}` : ''}</span></div>`).join('')
       : '<p class="muted">You’re all caught up.</p>'}</div>`;
+  root.querySelectorAll('[data-lift]').forEach((b) => b.onclick = async () => {
+    const { error } = await sb.rpc('phoenix_unban_user', { p_username: b.dataset.lift });
+    if (error) toast(errText(error)); else { toast('Suspension lifted'); viewModerate(); }
+  });
+  $('#banf', root).addEventListener('submit', (ev) => { ev.preventDefault(); suspendDialog(ev.target.u.value.trim().replace(/^@/, ''), viewModerate); });
   root.querySelectorAll('[data-resolve]').forEach((b) => b.onclick = async () => {
     const { error } = await sb.from('phoenix_flags').update({ resolved_at: new Date().toISOString() }).eq('id', b.dataset.resolve);
     if (error) toast(errText(error)); else { toast('Report handled'); viewModerate(); }
