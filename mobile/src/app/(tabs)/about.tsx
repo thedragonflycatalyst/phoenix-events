@@ -2,15 +2,15 @@ import Constants from 'expo-constants';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import * as WebBrowser from 'expo-web-browser';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Tile } from '@/components/events';
+import { DonateCard } from '@/components/donate';
 import { TopBar } from '@/components/header';
 import { Button, Card, Txt } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
 import { KINDS, myApplications, pendingApplications, type AppKind, type Application } from '@/lib/applications';
-import { CATS, DONATE_LINKS, PAYPAL_DONATE, type PEvent } from '@/lib/model';
+import { CATS, type PEvent } from '@/lib/model';
 import { sb } from '@/lib/supabase';
 import { F, POSTER, R, usePalette } from '@/lib/theme';
 
@@ -18,7 +18,6 @@ export default function About() {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const { setFilters, user, role, rsvps, isAdmin } = useApp();
-  const links = Object.entries(DONATE_LINKS).filter(([, u]) => u);
   const [shifts, setShifts] = useState<PEvent[]>([]);
   const [apps, setApps] = useState<Partial<Record<AppKind, Application>>>({});
   const [waiting, setWaiting] = useState(0);
@@ -44,6 +43,9 @@ export default function About() {
       <Txt v="display" style={{ marginTop: 14 }}>The Phoenix Catalyst</Txt>
       <Txt style={{ fontSize: 19, lineHeight: 28, marginTop: 12 }}>We strengthen mental, physical, emotional, and environmental well-being through community-driven events. Bringing color back into the world one community at a time.</Txt>
       <Txt v="small" style={{ fontSize: 16, marginTop: 10 }}>We picture neighborhoods where people know and support one another, local spaces thrive, and home is where you truly thrive.</Txt>
+
+      {/* Donations sit right under the mission so supporters see them first */}
+      <View style={{ marginTop: 20 }}><DonateCard /></View>
 
       {/* Volunteer hub */}
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 26 }}>
@@ -76,6 +78,7 @@ export default function About() {
         {isAdmin && (
           <Button kind="quiet" icon="group" title={waiting ? `Review applications (${waiting})` : 'Review applications'} onPress={() => router.push('/applications')} />
         )}
+        <Button kind="ghost" icon="add" title="Suggest a local organization’s calendar" onPress={() => router.push('/sources')} />
       </View>
 
       <Txt v="h2" style={{ marginTop: 26 }}>What we do</Txt>
@@ -98,16 +101,6 @@ export default function About() {
         <Button style={{ flex: 1 }} kind="ghost" title="Share an event" onPress={() => router.push('/add')} />
       </View>
 
-      <Card style={{ marginTop: 22 }}>
-        <Txt v="h2">Support our work</Txt>
-        <Txt v="small" style={{ fontSize: 16, marginTop: 6 }}>The Phoenix Catalyst is a Maryland 501(c)(3) nonprofit. This app is free for everyone, and donations keep it running.</Txt>
-        {links.length || PAYPAL_DONATE ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-            {links.map(([k, u]) => <Button key={k} kind={k === 'custom' && links.length > 1 ? 'ghost' : 'solid'} title={k === 'custom' ? (links.length === 1 ? 'Donate by card, Apple Pay or Google Pay' : 'Other amount') : `$${k}`} onPress={() => WebBrowser.openBrowserAsync(u)} style={{ minWidth: 76, flexGrow: links.length === 1 ? 1 : 0 }} />)}
-            {PAYPAL_DONATE ? <Button kind="ghost" title="Donate with PayPal" onPress={() => WebBrowser.openBrowserAsync(PAYPAL_DONATE)} style={{ minWidth: 76 }} /> : null}
-          </View>
-        ) : <Txt v="bold" style={{ marginTop: 12 }}>Online donations are opening soon.</Txt>}
-      </Card>
 
       <Card style={{ marginTop: 16 }}>
         <Txt v="h3">How posting works</Txt>

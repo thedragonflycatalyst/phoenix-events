@@ -4,9 +4,9 @@ export type PEvent = {
   id: string; created_by: string; created_by_username: string | null;
   title: string; description: string | null; starts_at: string; ends_at: string | null; all_day: boolean; timezone: string;
   location_name: string | null; address: string | null; lat: number | null; lng: number | null;
-  category: Cat; organizer: string | null; url: string | null; poster_path: string | null; source: 'manual' | 'poster';
+  category: Cat; organizer: string | null; url: string | null; poster_path: string | null; source: 'manual' | 'poster' | 'import'; import_source_id?: string | null;
   is_tpc: boolean; is_youth: boolean; chaperone_ratio: string | null; volunteer_slots: number | null; going_count: number; volunteer_count: number;
-  status: 'published' | 'hidden' | 'removed'; reviewed_at: string | null; cost: 'free' | 'paid' | 'donation'; tags: string[];
+  status: 'published' | 'hidden' | 'removed'; reviewed_at: string | null; cost: 'free' | 'paid' | 'donation' | 'check'; tags: string[];
   created_at: string; updated_at: string;
 };
 export type RsvpKind = 'going' | 'volunteer';
@@ -29,7 +29,7 @@ export const TAGS: [string, string][] = [
 ];
 export const TAG = Object.fromEntries(TAGS) as Record<string, string>;
 export const COSTS: [PEvent['cost'], string][] = [['free', 'Free'], ['donation', 'By donation'], ['paid', 'Paid']];
-export const COST = Object.fromEntries(COSTS) as Record<PEvent['cost'], string>;
+export const COST = { ...Object.fromEntries(COSTS), check: 'See details' } as Record<PEvent['cost'], string>;
 export const WHENS: [string, string][] = [['upcoming', 'Upcoming'], ['today', 'Today'], ['weekend', 'This weekend'], ['week', 'Next 7 days'], ['month', 'Next 30 days']];
 export const RADII: [number | null, string][] = [[null, 'Any distance'], [2, 'Within 2 mi'], [5, 'Within 5 mi'], [10, 'Within 10 mi'], [25, 'Within 25 mi']];
 export const HOME = { lat: 39.2037, lng: -76.861, name: 'Columbia, MD' };

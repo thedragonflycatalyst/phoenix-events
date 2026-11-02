@@ -69,6 +69,7 @@ function Shell() {
         <Stack.Screen name="account" options={{ title: 'Account' }} />
         <Stack.Screen name="moderate" options={{ title: 'Review posts' }} />
         <Stack.Screen name="admin" options={{ title: 'Team roles' }} />
+        <Stack.Screen name="sources" options={{ title: 'Local organizations' }} />
       </Stack>
     </>
   );

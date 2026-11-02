@@ -342,3 +342,22 @@ dialog h2 { margin-bottom: 12px; }
 .answers dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 480px) { .answers { grid-template-columns: minmax(0, 1fr); } .answers dd { margin-bottom: 6px; } }
 input[type=file] { max-width: 100%; min-height: 44px; }
+
+/* Donation flow: how often → how much → how to give */
+.give { border: 2px solid var(--well); }
+.give .kicker { color: var(--well); font-weight: 700; font-size: .88rem; margin: 0; }
+.give fieldset { border: 0; padding: 0; margin: 18px 0 0; min-width: 0; }
+.give legend { display: flex; align-items: center; gap: 10px; font-weight: 700; margin-bottom: 10px; padding: 0; }
+.give .step { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--focus); font-size: .85rem; }
+.give .seg { display: flex; background: var(--soft); border-radius: 999px; padding: 4px; }
+.give .seg label, .give .amts label { flex: 1; position: relative; }
+.give input[type=radio] { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.give .seg span { display: block; text-align: center; padding: 10px 6px; border-radius: 999px; border: 1.5px solid transparent; }
+.give .seg input:checked + span { background: var(--surface); border-color: var(--focus); font-weight: 700; }
+.give .amts { display: flex; gap: 8px; }
+.give .amts label:last-child { flex: 1.6; }
+.give .amts span { display: grid; place-items: center; min-height: 52px; border-radius: var(--r-md); border: 1.5px solid var(--line); font-weight: 700; font-size: 1.1rem; }
+.give .amts input:checked + span { border: 2px solid var(--focus); background: var(--soft); }
+.give input[type=radio]:focus-visible + span { outline: 3px solid var(--focus); outline-offset: 2px; }
+.give #custwrap { margin-top: 10px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, DONATE_LINKS, PAYPAL_DONATE, HOME } from './config.js?v=20';
-import { readPoster, compressImage } from './ocr.js?v=20';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=21';
+import { readPoster, compressImage } from './ocr.js?v=21';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -231,7 +231,7 @@ function accountDialog() {
     <div class="row" style="justify-content:center">
       <a class="btn small quiet" href="#/mine" data-close>My events</a>
       ${isMod() ? '<a class="btn small quiet" href="#/moderate" data-close>Review posts</a>' : ''}
-      ${isAdmin() ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a><a class="btn small quiet" href="#/applications" data-close>Applications</a>' : ''}
+      ${isAdmin() ? '<a class="btn small quiet" href="#/admin" data-close>Team roles</a><a class="btn small quiet" href="#/applications" data-close>Applications</a>' : ''}${canTpc() ? '<a class="btn small quiet" href="#/sources" data-close>Local organizations</a>' : ''}
       <button class="btn small ghost" id="signout" type="button">Sign out</button>
     </div>
     <details class="panel" id="blockedwrap"><summary><b>Blocked people</b></summary><div id="blockedlist" class="small muted">Loading…</div></details>
@@ -448,7 +448,7 @@ function activeFilterCount() {
 
 /* ---------- views ---------- */
 const EMOJI = { environmental: '🌿', community: '🤝', wellness: '🏃', mental: '🧘', arts: '🎨', other: '✨' };
-const COST = Object.fromEntries(COSTS);
+const COST = { ...Object.fromEntries(COSTS), check: 'See details' };
 const SVG = {
   search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   sliders: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>',
@@ -865,7 +865,8 @@ async function viewEvent(id) {
     </div>
     ${e.is_youth ? `<div class="panel" style="margin-top:16px"><b>🧒 Youth event${e.chaperone_ratio ? ` · ${h(e.chaperone_ratio)}` : ''}</b><p class="small muted" style="margin:4px 0 0">Youth event: approved adult chaperones supervise at this ratio. Volunteers here must be 18+ and cleared by the team.</p></div>` : ''}
     ${e.description ? `<h2 style="margin:22px 0 8px">About</h2><p class="desc">${h(e.description)}</p>` : ''}
-    ${e.url ? `<p><a target="_blank" rel="noopener nofollow" href="${h(e.url)}">More info from the organizer</a></p>` : ''}
+    ${e.source === 'import' ? `<p class="small muted">From ${h(e.organizer || 'the organizer')}’s public calendar. Times and details can change, so check their page before you go.</p>` : ''}
+    ${e.url ? `<p><a target="_blank" rel="noopener nofollow" href="${h(e.url)}">${e.source === 'import' ? `Open on ${h(e.organizer || 'their')} calendar` : 'More info from the organizer'}</a></p>` : ''}
     <div class="rsvpbar">
       ${e.is_tpc ? `<button class="btn ${rs === 'volunteer' ? 'on' : 'glow'}" id="vol" ${full && rs !== 'volunteer' ? 'disabled' : ''}>${rs === 'volunteer' ? '✓ Volunteering' : full ? 'Spots full' : '🔥 Volunteer'}</button>` : ''}
       <button class="btn ${rs === 'going' ? 'on' : e.is_tpc ? 'quiet' : 'glow'}" id="going">${rs === 'going' ? '✓ Going' : 'I’m going'}</button>
@@ -1458,11 +1459,11 @@ async function viewApplications() {
 
 /* ---------- about: volunteer hub, mission and donations ---------- */
 async function viewAbout() {
-  const links = Object.entries(DONATE_LINKS).filter(([, u]) => u);
   const shifts = [...state.rsvps.values()].filter((k) => k === 'volunteer').length;
   main().innerHTML = `<div class="detail">
     <h1>The Phoenix Catalyst</h1>
     <p style="margin-top:12px;font-size:1.1rem">We strengthen mental, physical, emotional, and environmental well-being through community-driven events. Bringing color back into the world one community at a time.</p>
+    ${donateHtml()}
     <div class="sechead"><h2>Volunteer opportunities</h2><a href="#/" id="seevol" class="small">See all</a></div>
     ${shifts ? `<p class="small muted">You’re signed up for ${shifts} shift${shifts === 1 ? '' : 's'}. They’re in <a href="#/mine">My events</a>.</p>` : ''}
     <div id="volrail"><p class="muted small">Loading…</p></div>
@@ -1476,15 +1477,11 @@ async function viewAbout() {
       wellness: 'Walking and running groups, races, hikes and yoga that make movement accessible to everyone.',
       mental: 'Meditation, sound baths, journaling circles and awareness campaigns that support emotional resilience.' }[c.key])}</p></div>`).join('')}</div>
     <div class="row"><a class="btn ghost" href="#/add">Share a community event</a></div>
-    <div class="panel" style="margin-top:20px"><h2>Support our work</h2>
-      <p class="muted">The Phoenix Catalyst is a Maryland 501(c)(3) nonprofit. This app is free for everyone, and donations keep it running.</p>
-      ${links.length || PAYPAL_DONATE ? `<div class="donate">${links.map(([k, u]) => `<a class="btn ${k === 'custom' && links.length > 1 ? 'ghost' : ''}" target="_blank" rel="noopener" href="${h(u)}">${k === 'custom' ? (links.length === 1 ? 'Donate by card, Apple Pay or Google Pay' : 'Other amount') : `$${k}`}</a>`).join('')}${PAYPAL_DONATE ? `<a class="btn ghost" target="_blank" rel="noopener" href="${h(PAYPAL_DONATE)}">Donate with PayPal</a>` : ''}</div>`
-        : '<p><b>Online donations are opening soon.</b></p>'}
-    </div>
     <div class="panel"><h2>How posting works</h2>
       <p>Anyone with an account can post events, and they go live right away. Volunteer moderators review posts and remove anything that isn’t a real community event. If something looks wrong, open the event and choose Report a problem.</p></div>
   </div>`;
   $('#seevol').onclick = () => { Object.assign(state.filters, { tpc: true, when: 'upcoming' }); state.day = null; saveFilters(); };
+  wireDonate($('#give'));
   const [{ data: ev }, apps, pending] = await Promise.all([
     sb.from('phoenix_events').select('*').eq('is_tpc', true).eq('status', 'published').gte('starts_at', new Date().toISOString()).order('starts_at').limit(10),
     myApplications(),
@@ -1498,7 +1495,138 @@ async function viewAbout() {
     const done = st && !st.startsWith('Not');
     return `<div class="panel gi"><span class="e" aria-hidden="true">${info.emoji}</span><div><h3>${h(info.title)}</h3><p class="small muted" style="margin:0">${h(st || info.blurb)}</p></div>
       ${done ? '' : `<a class="btn small" href="#/apply/${k}" aria-label="Apply: ${h(info.title)}">Apply</a>`}</div>`;
-  }).join('') + (isAdmin() ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '');
+  }).join('') + (isAdmin() ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '')
+    + '<a class="btn ghost" href="#/sources">Suggest a local organization’s calendar</a>';
+}
+
+/* ---------- donations: how often → how much → card or PayPal (same flow as the website) ---------- */
+const GIVE_SITE = 'https://thedragonflycatalyst.org', GIVE_PAYPAL = 'ThePhoenixCatalyst@outlook.com';
+function donateHtml() {
+  const seg = [['once', 'One time'], ['month', 'Monthly'], ['year', 'Yearly']];
+  return `<form class="panel give" id="give" novalidate>
+    <p class="kicker">🔥 Donate · tax-deductible</p>
+    <h2 style="margin:2px 0 6px">Keep our events free</h2>
+    <p class="muted" style="margin:0">Every dollar goes to free community events: cleanup supplies, saplings, food drive logistics, and space for group workouts and mental health gatherings.</p>
+    <fieldset><legend><span class="step">1</span> How often?</legend><div class="seg">${seg.map(([k, l], i) => `<label><input type="radio" name="freq" value="${k}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div></fieldset>
+    <fieldset><legend><span class="step">2</span> How much?</legend><div class="amts">${['10', '25', '50'].map((a) => `<label><input type="radio" name="amt" value="${a}" ${a === '25' ? 'checked' : ''}><span>$${a}</span></label>`).join('')}<label><input type="radio" name="amt" value="custom"><span>Other</span></label></div>
+      <label class="field" id="custwrap" hidden><span class="sr-only">Amount in dollars</span><input type="number" name="custom" min="5" max="10000" step="1" inputmode="decimal" placeholder="Amount in dollars"></label></fieldset>
+    <fieldset><legend><span class="step">3</span> How would you like to give?</legend>
+      <p id="givesum" style="margin:0 0 10px"></p>
+      <div class="row"><button class="btn glow" type="submit" value="card">Card, Google Pay or Apple Pay</button><button class="btn ghost" type="submit" value="paypal">PayPal or Venmo</button></div>
+      <p class="error" id="giveerr" role="alert"></p></fieldset>
+    <p class="small muted" style="margin:0">Monthly and yearly gifts can be cancelled any time. PayPal repeat gifts need a PayPal login. Minimum $5. The Phoenix Catalyst Inc is a 501(c)(3) nonprofit (EIN 41-3050300); you’ll get an emailed receipt for your taxes.</p>
+  </form>`;
+}
+function wireDonate(f) {
+  if (!f) return;
+  const words = { once: 'one time', month: 'every month', year: 'every year' };
+  const amount = () => {
+    const v = f.amt.value === 'custom' ? Number(f.custom.value) : Number(f.amt.value);
+    return Number.isFinite(v) && v >= 5 && v <= 10000 ? Math.round(v * 100) / 100 : null;
+  };
+  const update = () => {
+    $('#custwrap', f).hidden = f.amt.value !== 'custom';
+    const a = amount();
+    $('#givesum', f).textContent = a ? `You’re giving $${a % 1 ? a.toFixed(2) : a} ${words[f.freq.value]}.` : 'Enter an amount of $5 or more.';
+  };
+  f.addEventListener('change', (e) => { update(); if (e.target.value === 'custom') f.custom.focus(); });
+  f.addEventListener('input', update); update();
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const err = $('#giveerr', f); err.textContent = '';
+    const a = amount(), freq = f.freq.value, how = e.submitter?.value || 'card';
+    if (!a) { err.textContent = 'Enter an amount of $5 or more.'; return; }
+    if (how === 'paypal') {
+      const q = { business: GIVE_PAYPAL, currency_code: 'USD', no_shipping: '1', return: `${GIVE_SITE}/phoenix-catalyst/thank-you`, cancel_return: `${GIVE_SITE}/phoenix-catalyst#donate`, notify_url: `${GIVE_SITE}/api/paypal-ipn` };
+      const url = freq === 'once'
+        ? `https://www.paypal.com/donate/?${new URLSearchParams({ ...q, amount: a.toFixed(2), item_name: 'Donation to The Phoenix Catalyst', no_recurring: '1' })}`
+        : `https://www.paypal.com/cgi-bin/webscr?${new URLSearchParams({ ...q, cmd: '_xclick-subscriptions', a3: a.toFixed(2), p3: '1', t3: freq === 'month' ? 'M' : 'Y', src: '1', item_name: `${freq === 'month' ? 'Monthly' : 'Yearly'} donation to The Phoenix Catalyst` })}`;
+      location.href = url; return;
+    }
+    const btn = e.submitter; busy(btn, true, 'One moment…');
+    try {
+      const r = await fetch(`${GIVE_SITE}/api/donate`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount: a, frequency: freq }) });
+      const j = await r.json();
+      if (!j.url) throw new Error(j.error || 'Card checkout isn’t available right now. Please try PayPal, or try again shortly.');
+      location.href = j.url;
+    } catch (x) { err.textContent = /fetch|network/i.test(x.message) ? 'Card checkout isn’t available right now. Please try PayPal, or try again shortly.' : x.message; busy(btn, false); }
+  });
+}
+
+/* ---------- local organizations whose calendars we import ---------- */
+async function viewSources() {
+  const leader = canTpc();
+  main().innerHTML = `<div class="detail"><h1>Local organizations</h1>
+    <p>We bring in events from local organizations’ own calendars automatically, so you don’t have to check a dozen websites.</p>
+    <form class="panel" id="srcf" novalidate><h2>${leader ? 'Add an organization' : 'Suggest an organization'}</h2>
+      <label class="field"><span>Organization</span><input name="name" maxlength="120" placeholder="Howard County Library" required></label>
+      <label class="field"><span>Their events page</span><input name="website" type="url" maxlength="500" placeholder="https://…/events" required></label>
+      <label class="field"><span>Calendar feed link <span class="muted small">(optional, iCal or “Add to calendar” link)</span></span><input name="feed" type="url" maxlength="500"></label>
+      <label class="field"><span>Why they’re a good fit <span class="muted small">(optional)</span></span><textarea name="note" maxlength="1000"></textarea></label>
+      <p class="error" id="srcerr" role="alert"></p>
+      <button class="btn" type="submit">${leader ? 'Add and import' : 'Send suggestion'}</button>
+      ${leader ? '' : '<p class="small muted">Phoenix leaders review suggestions before their events appear.</p>'}</form>
+    <div id="srclist"><p class="muted small">Loading…</p></div></div>`;
+  const fix = (u) => { const t = (u || '').trim(); return t && !/^https?:\/\//i.test(t) ? `https://${t}` : t; };
+  const ago = (iso) => { if (!iso) return 'not yet'; const m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 60 ? `${Math.max(1, m)} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`; };
+  const invoke = async (body) => { const { data, error } = await sb.functions.invoke('phoenix-import', { body }); if (error) throw error; return data; };
+  const run = async (s) => { const r = await invoke({ source_id: s.id }); const x = r.results?.[0]; if (x?.error) throw new Error(x.error); return `${x?.added ?? 0} added, ${x?.updated ?? 0} updated`; };
+  const paint = async () => {
+    const { data, error } = await sb.from('phoenix_sources').select('*').order('name');
+    const box = $('#srclist'); if (!box) return;
+    if (error) { box.innerHTML = `<p class="error">${h(errText(error))}</p>`; return; }
+    const groups = [['Waiting for review', 'suggested'], ['Calendars we follow', 'active'], ['Paused', 'paused']];
+    box.innerHTML = groups.map(([title, st]) => {
+      const items = data.filter((s) => s.status === st); if (!items.length) return '';
+      return `<h2 style="margin-top:22px">${title}</h2>` + items.map((s) => `<div class="panel" data-id="${s.id}">
+        <h3 style="margin:0">${h(s.name)}${st === 'suggested' ? ' <span class="badge">Suggested</span>' : ''}</h3>
+        <p class="small" style="margin:2px 0"><a href="${h(s.website)}" target="_blank" rel="noopener nofollow">${h(s.website.replace(/^https?:\/\/(www\.)?/, ''))}</a></p>
+        ${s.note ? `<p class="small muted" style="margin:4px 0">${h(s.note)}</p>` : ''}
+        ${st === 'suggested' && s.suggested_by_username ? `<p class="small muted" style="margin:4px 0">Suggested by @${h(s.suggested_by_username)}</p>` : ''}
+        ${leader && st !== 'suggested' ? `<p class="small muted" style="margin:4px 0">${s.last_error ? `⚠️ Last check ${ago(s.last_run_at)}: ${h(s.last_error)}` : s.last_run_at ? `Checked ${ago(s.last_run_at)} · ${s.last_count ?? 0} events${s.last_method ? ` · ${h(s.last_method)}` : ''}` : 'Not checked yet'}</p>` : ''}
+        <div class="pv"></div>
+        ${leader ? `<div class="row">${st === 'suggested' ? '<button class="btn small ghost" data-act="preview">Preview</button><button class="btn small" data-act="active">Approve</button><button class="btn small quiet" data-act="rejected">Decline</button>'
+          : st === 'active' ? '<button class="btn small ghost" data-act="run">Check now</button><button class="btn small quiet" data-act="paused">Pause</button>'
+          : '<button class="btn small ghost" data-act="active">Resume</button>'}</div>` : ''}
+      </div>`).join('');
+    }).join('');
+    box.onclick = async (ev) => {
+      const b = ev.target.closest('[data-act]'); if (!b) return;
+      const card = b.closest('[data-id]'); const s = data.find((x) => x.id === card.dataset.id); const act = b.dataset.act;
+      busy(b, true, '…');
+      try {
+        if (act === 'preview') {
+          const r = await invoke({ preview: s.website, feed: s.feed_url || undefined });
+          $('.pv', card).innerHTML = `<div class="panel" style="background:var(--soft)">${r.error ? `⚠️ ${h(r.error)}` : `<b>Found ${r.count} upcoming event${r.count === 1 ? '' : 's'}${r.method ? ` (${h(r.method)})` : ''}</b>${(r.sample || []).map((e) => `<br><span class="small">• ${h(fmtDay(e.starts_at))}: ${h(e.title)}</span>`).join('')}`}</div>`;
+          busy(b, false); return;
+        }
+        if (act === 'run') { toast(`${s.name}: ${await run(s)}`); }
+        else {
+          if (act === 'paused' && !confirm(`Pause ${s.name}? New events stop coming in; events already imported stay.`)) { busy(b, false); return; }
+          const { error } = await sb.from('phoenix_sources').update({ status: act }).eq('id', s.id); if (error) throw error;
+          toast(act === 'active' ? `Approved ${s.name}. Importing its events…` : act === 'paused' ? `Paused ${s.name}` : 'Suggestion declined');
+          if (act === 'active') toast(`${s.name}: ${await run(s)}`);
+        }
+      } catch (x) { toast(errText(x)); }
+      paint();
+    };
+  };
+  $('#srcf').onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target, err = $('#srcerr'); err.textContent = '';
+    if (!requireUser('Sign in to suggest an organization.')) return;
+    if (f.name.value.trim().length < 2) { err.textContent = 'Add the organization’s name.'; return; }
+    if (!/\./.test(f.website.value)) { err.textContent = 'Add their website or events page.'; return; }
+    const btn = f.querySelector('[type=submit]'); busy(btn, true, 'Sending…');
+    const { data: s, error } = await sb.from('phoenix_sources').insert({ name: f.name.value.trim(), website: fix(f.website.value), feed_url: f.feed.value.trim() ? fix(f.feed.value) : null, note: f.note.value.trim() || null, ...(leader ? { status: 'active' } : {}) }).select('*').single();
+    busy(btn, false);
+    if (error) { err.textContent = error.code === '23505' ? 'That website is already on the list.' : errText(error); return; }
+    f.reset();
+    if (s.status === 'active') { toast(`Added ${s.name}. Importing its events…`); run(s).then((r) => toast(`${s.name}: ${r}`), (x) => toast(`${s.name}: ${errText(x)}`)).finally(paint); }
+    else toast('Thanks! Phoenix leaders will take a look.');
+    paint();
+  };
+  paint();
 }
 
 /* ---------- router ---------- */
@@ -1506,7 +1634,7 @@ async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, id] = hash.split('/');
   document.title = 'Phoenix Community Calendar';
-  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about' }[page] ?? '';
+  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about', sources: 'about' }[page] ?? '';
   document.querySelectorAll('.tabs a').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
   try {
@@ -1520,6 +1648,7 @@ async function route() {
     else if (page === 'about') await viewAbout();
     else if (page === 'apply') await viewApply(id);
     else if (page === 'applications') await viewApplications();
+    else if (page === 'sources') await viewSources();
     else await viewCalendar();
   } catch (e) {
     main().innerHTML = `<div class="empty"><h2>Something went wrong</h2><p>${h(errText(e))}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;

@@ -137,7 +137,8 @@ export default function EventScreen() {
           )}
 
           {e.description ? <><Txt v="h2" style={{ marginTop: 24, marginBottom: 8 }}>About</Txt><Txt>{e.description}</Txt></> : null}
-          {e.url ? <Button kind="ghost" small icon="public" title="More info from the organizer" style={{ alignSelf: 'flex-start', marginTop: 14 }} onPress={() => WebBrowser.openBrowserAsync(e.url!)} /> : null}
+          {e.source === 'import' ? <Txt v="small" style={{ marginTop: 14 }}>From {e.organizer ?? 'the organizer'}’s public calendar. Times and details can change, so check their page before you go.</Txt> : null}
+          {e.url ? <Button kind="ghost" small icon="public" title={e.source === 'import' ? `Open on ${e.organizer ?? 'their'} calendar` : 'More info from the organizer'} style={{ alignSelf: 'flex-start', marginTop: 14 }} onPress={() => WebBrowser.openBrowserAsync(e.url!)} /> : null}
           <Txt v="small" style={{ marginTop: 18 }}>Posted by @{e.created_by_username || 'neighbor'}{e.source === 'poster' ? ' from a flyer photo' : ''}. Details can change, so check with the organizer.</Txt>
           {e.status === 'published' && <CommentsPreview eventId={e.id} count={social.comments} refreshKey={seen} />}
 

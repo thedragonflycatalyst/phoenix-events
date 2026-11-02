@@ -53,7 +53,7 @@ export function Tile({ e }: { e: PEvent }) {
   );
 }
 
-function Badge({ label, tone }: { label: string; tone?: 'ink' | 'good' }) {
+export function Badge({ label, tone }: { label: string; tone?: 'ink' | 'good' }) {
   const p = usePalette();
   const bg = tone === 'ink' ? p.ink : tone === 'good' ? `${p.good}2e` : p.soft;
   const fg = tone === 'ink' ? p.bg : tone === 'good' ? p.good : p.muted;
