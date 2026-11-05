@@ -10,6 +10,8 @@ import {
   resendVerification, revokeSession, setUsername, uploadAvatar, type DeviceSession,
 } from '@/lib/account';
 import { useApp } from '@/lib/app-state';
+import { useBiometricSecurity } from '@/features/biometric-security';
+import { rememberLogin, setRememberLogin } from '@/lib/remember-login';
 import { fmtShort, fmtTime } from '@/lib/dates';
 import { errText } from '@/lib/model';
 import { blockedPeople, unblockUser } from '@/lib/safety';
@@ -22,6 +24,8 @@ export default function Account() {
   const p = usePalette();
   const toast = useToast();
   const app = useApp();
+  const security = useBiometricSecurity();
+  const [remember, setRemember] = useState(rememberLogin());
   const [open, setOpen] = useState<Open>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [f, setF] = useState({ current: '', next: '', confirm: '', email: '', username: '', del: '', code: '' });
@@ -119,6 +123,17 @@ export default function Account() {
               : run('password', () => changePassword(email, f.current, f.next), 'Password changed', () => setOpen(null))} />
           </Panel>
         )}
+        <Row icon="login" title="Keep me signed in"
+          sub={remember ? 'On · saved across restarts' : 'Off · sign in again next time'}
+          onPress={() => { const next = !remember; setRememberLogin(next); setRemember(next); }} />
+        <Row icon="fingerprint" title="Unlock with biometrics"
+          sub={security.enabled ? 'Enabled · Face ID or fingerprint' : security.available ? 'Off · tap to enable' : 'Not available or not enrolled'}
+          onPress={() => {
+            if (!security.enabled && !security.available) return toast('Enroll Face ID or a fingerprint on this phone first', false);
+            void security.setEnabled(!security.enabled).then((ok) => {
+              if (!ok) toast('Biometric authentication was canceled or unavailable', false);
+            });
+          }} />
         <Row icon="devices" title="Signed-in devices" sub="See where you’re signed in" onPress={() => { toggle('devices'); if (open !== 'devices') loadDevices(); }} open={open === 'devices'} last={open !== 'devices'} />
         {open === 'devices' && (
           <Panel last>

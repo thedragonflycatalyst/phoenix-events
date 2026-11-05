@@ -1,8 +1,9 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
 import { Button, Field, Txt, useToast } from '@/components/ui';
 import { useApp } from '@/lib/app-state';
+import { rememberLogin, setRememberLogin } from '@/lib/remember-login';
 import { errText } from '@/lib/model';
 import { confirmWithCode, recoverWithCode, resendVerification, sendRecoveryCode } from '@/lib/account';
 import { usePalette } from '@/lib/theme';
@@ -18,6 +19,7 @@ export default function SignIn() {
   const [uname, setUname] = useState('');
   const [pw, setPw] = useState('');
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(rememberLogin());
   const [err, setErr] = useState('');
 
   const submit = async () => {
@@ -25,12 +27,14 @@ export default function SignIn() {
     try {
       if (mode === 'in') {
         if (!id.trim() || !pw) throw new Error('Enter your username or email and password.');
+        setRememberLogin(remember);
         await signIn(id.trim(), pw);
         toast('Signed in'); router.back();
       } else {
         if (!email.includes('@')) throw new Error('Enter your email.');
         if (!/^[A-Za-z0-9][A-Za-z0-9_.-]{2,29}$/.test(uname)) throw new Error('dragonfly_username_invalid');
         if (pw.length < 8) throw new Error('Use at least 8 characters for your password.');
+        setRememberLogin(remember);
         const r = await signUp(email.trim(), uname.trim(), pw);
         if (r === 'signed-in') { toast('Welcome! 🔥'); router.back(); } else setMode('sent');
       }
@@ -94,6 +98,10 @@ export default function SignIn() {
           <>
             <Field label="Username or email" value={id} onChangeText={setId} autoCapitalize="none" autoComplete="username" autoCorrect={false} />
             <Field label="Password" value={pw} onChangeText={setPw} secureTextEntry autoComplete="current-password" onSubmitEditing={submit} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+              <Txt>Keep me signed in</Txt>
+              <Switch accessibilityLabel="Keep me signed in" value={remember} onValueChange={setRemember} />
+            </View>
           </>
         ) : (
           <>

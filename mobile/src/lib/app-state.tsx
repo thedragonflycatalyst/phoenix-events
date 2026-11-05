@@ -6,6 +6,7 @@ import { avatarUrl } from './account';
 import type { Near } from './geo';
 import { HOME, type PEvent, type Role, type RsvpKind } from './model';
 import { recall, sb, store, USERNAME_LOGIN_FN, SUPABASE_KEY } from './supabase';
+import { rememberLogin } from './remember-login';
 import { refreshCalendarWidget } from '@/widget/refresh';
 import { myBlocks } from './safety';
 
@@ -65,10 +66,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     sb.auth.getSession().then(async ({ data }) => {
-      lastUid.current = data.session?.user.id ?? null;
-      await loadFor(data.session?.user ?? null).catch(() => {});
+      let session = data.session;
+      if (!rememberLogin() && session) {
+        await sb.auth.signOut({ scope: 'local' });
+        session = null;
+      }
+      lastUid.current = session?.user.id ?? null;
+      await loadFor(session?.user ?? null).catch(() => {});
       setReady(true);
-    });
+    }).catch(() => setReady(true));
     const { data: sub } = sb.auth.onAuthStateChange((_e, session) => {
       const uid = session?.user.id ?? null;
       if (uid !== lastUid.current) { lastUid.current = uid; setTimeout(() => loadFor(session?.user ?? null).catch(() => {}), 0); }
