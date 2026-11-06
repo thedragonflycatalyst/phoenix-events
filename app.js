@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=22';
-import { readPoster, compressImage } from './ocr.js?v=22';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=23';
+import { readPoster, compressImage } from './ocr.js?v=23';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -1508,13 +1508,15 @@ function donateHtml() {
     <h2 style="margin:2px 0 6px">Keep our events free</h2>
     <p class="muted" style="margin:0">Every dollar goes to free community events: cleanup supplies, saplings, food drive logistics, and space for group workouts and mental health gatherings.</p>
     <fieldset><legend><span class="step">1</span> How often?</legend><div class="seg">${seg.map(([k, l], i) => `<label><input type="radio" name="freq" value="${k}" ${i ? '' : 'checked'}><span>${l}</span></label>`).join('')}</div></fieldset>
-    <fieldset><legend><span class="step">2</span> How much?</legend><div class="amts">${['10', '25', '50'].map((a) => `<label><input type="radio" name="amt" value="${a}" ${a === '25' ? 'checked' : ''}><span>$${a}</span></label>`).join('')}<label><input type="radio" name="amt" value="custom"><span>Other</span></label></div>
+    <fieldset><legend><span class="step">2</span> How much?</legend><div class="amts">${['10', '25', '50'].map((a) => `<label><input type="radio" name="amt" value="${a}" ${a === '25' ? 'checked' : ''}><span>$${a}</span></label>`).join('')}<label><input type="radio" name="amt" value="custom"><span>Custom amount</span></label></div>
       <label class="field" id="custwrap" hidden><span class="sr-only">Amount in dollars</span><input type="number" name="custom" min="5" max="10000" step="1" inputmode="decimal" placeholder="Amount in dollars"></label></fieldset>
     <fieldset><legend><span class="step">3</span> How would you like to give?</legend>
       <p id="givesum" style="margin:0 0 10px"></p>
-      <div class="row"><button class="btn glow" type="submit" value="card">Card, Google Pay or Apple Pay</button><button class="btn ghost" type="submit" value="paypal">PayPal or Venmo</button></div>
+      <div class="row"><button class="btn glow" type="submit" value="card">Card, Google Pay or Apple Pay</button><button class="btn ghost" type="submit" value="paypal">PayPal</button></div>
       <p class="error" id="giveerr" role="alert"></p></fieldset>
-    <p class="small muted" style="margin:0">Monthly and yearly gifts can be cancelled any time. PayPal repeat gifts need a PayPal login. Minimum $5. The Phoenix Catalyst Inc is a 501(c)(3) nonprofit (EIN 41-3050300); you’ll get an emailed receipt for your taxes.</p>
+    <p class="small muted" style="margin:0">Monthly and yearly gifts can be cancelled any time. PayPal repeat gifts need a PayPal login. Minimum $5. The Phoenix Catalyst Inc is a 501(c)(3) nonprofit (EIN 41-3050300); you’ll get an emailed receipt for your records. No goods or services are given in exchange for donations.</p>
+    <p class="small" style="margin:8px 0 0"><a href="${GIVE_SITE}/phoenix-catalyst/receipts" target="_blank" rel="noopener">Look up past donations and download receipts →</a></p>
+    <p class="small muted" style="margin:8px 0 0">A copy of the current financial statement of The Phoenix Catalyst Inc is available by writing to 7428 Oakland Mills Rd, Columbia, MD 21046. Documents and information submitted under the Maryland Solicitations Act are also available, for the cost of postage and copies, from the Maryland Secretary of State, State House, Annapolis, MD 21401, (410) 974-5534.</p>
   </form>`;
 }
 function wireDonate(f) {

@@ -12,6 +12,7 @@ const PAYPAL = 'ThePhoenixCatalyst@outlook.com';
 const FREQS = [['once', 'One time'], ['month', 'Monthly'], ['year', 'Yearly']] as const;
 type Freq = (typeof FREQS)[number][0];
 const AMOUNTS = ['10', '25', '50'];
+const MD_DISCLOSURE = 'A copy of the current financial statement of The Phoenix Catalyst Inc is available by writing to 7428 Oakland Mills Rd, Columbia, MD 21046. Documents and information submitted under the Maryland Solicitations Act are also available, for the cost of postage and copies, from the Maryland Secretary of State, State House, Annapolis, MD 21401, (410) 974-5534.';
 const WORDS: Record<Freq, string> = { once: 'one time', month: 'every month', year: 'every year' };
 
 function paypalUrl(a: number, freq: Freq) {
@@ -79,7 +80,7 @@ export function DonateCard() {
         {[...AMOUNTS, 'custom'].map((a) => (
           <Pressable key={a} onPress={() => { Haptics.selectionAsync().catch(() => {}); setPick(a); }} accessibilityRole="radio" accessibilityState={{ selected: pick === a }}
             style={{ flex: a === 'custom' ? 1.6 : 1, minHeight: 52, borderRadius: R.md, alignItems: 'center', justifyContent: 'center', borderWidth: pick === a ? 2 : 1.5, borderColor: pick === a ? p.focus : p.line, backgroundColor: pick === a ? p.soft : 'transparent' }}>
-            <Text style={{ fontFamily: F.bodyBold, fontSize: a === 'custom' ? 15 : 18, color: p.ink }}>{a === 'custom' ? 'Other' : `$${a}`}</Text>
+            <Text style={{ fontFamily: F.bodyBold, fontSize: a === 'custom' ? 15 : 18, color: p.ink }}>{a === 'custom' ? 'Custom amount' : `$${a}`}</Text>
           </Pressable>
         ))}
       </View>
@@ -94,9 +95,13 @@ export function DonateCard() {
       <Step n={3} label="How would you like to give?" />
       <Txt style={{ marginBottom: 10 }}>{amount ? `You’re giving $${amount % 1 ? amount.toFixed(2) : amount} ${WORDS[freq]}.` : 'Enter an amount of $5 or more.'}</Txt>
       <Button title="Card, Google Pay or Apple Pay" icon="credit_card" busy={busy} onPress={card} />
-      <Button kind="ghost" title="PayPal or Venmo" onPress={paypal} style={{ marginTop: 10 }} />
+      <Button kind="ghost" title="PayPal" onPress={paypal} style={{ marginTop: 10 }} />
       <Txt v="small" style={{ marginTop: 12 }}>Monthly and yearly gifts can be cancelled any time. PayPal repeat gifts need a PayPal login. Minimum $5.</Txt>
-      <Txt v="small" style={{ marginTop: 6 }}>The Phoenix Catalyst Inc is a 501(c)(3) nonprofit (EIN 41-3050300). You’ll get an emailed receipt for your taxes.</Txt>
+      <Txt v="small" style={{ marginTop: 6 }}>The Phoenix Catalyst Inc is a 501(c)(3) nonprofit (EIN 41-3050300). You’ll get an emailed receipt for your records. No goods or services are given in exchange for donations.</Txt>
+      <Pressable accessibilityRole="link" onPress={() => { void WebBrowser.openBrowserAsync(`${SITE}/phoenix-catalyst/receipts`); }} style={{ marginTop: 10, minHeight: 44, justifyContent: 'center' }}>
+        <Txt v="bold" color={p.focus}>Look up past donations and download receipts →</Txt>
+      </Pressable>
+      <Txt v="small" style={{ marginTop: 6 }}>{MD_DISCLOSURE}</Txt>
     </Card>
   );
 }
