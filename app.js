@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=24';
-import { readPoster, compressImage } from './ocr.js?v=24';
-import { FAQ } from './faq.js?v=24';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=25';
+import { readPoster, compressImage } from './ocr.js?v=25';
+import { FAQ, RULES } from './faq.js?v=25';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -829,6 +829,7 @@ async function wireSocial(e) {
     form.onsubmit = async (ev) => {
       ev.preventDefault();
       const body = form.body.value.trim(); if (!body) return;
+      if (!(await agreeToRules())) return;
       const btn = form.querySelector('[type=submit]'); busy(btn, true, 'Posting…');
       try {
         const { data, error } = await sb.from('phoenix_comments').insert({ event_id: e.id, user_id: state.user.id, body, parent_id: replyTo ? (replyTo.parent_id || replyTo.id) : null }).select(COMMENT_COLS).single();
@@ -1037,6 +1038,7 @@ function wireEventForm(existing, extras = {}) {
   f.allday.onchange = syncTimes; syncTimes();
   f.addEventListener('submit', async (ev) => {
     ev.preventDefault(); err.textContent = '';
+    if (!existing && !(await agreeToRules())) return;
     const btn = f.querySelector('[type=submit]');
     const title = f.title.value.trim(), date = f.date.value;
     if (title.length < 2) { err.textContent = 'Add an event name.'; f.title.focus(); return; }
@@ -1515,6 +1517,25 @@ async function viewApplications() {
 }
 
 /* ---------- about: volunteer hub, mission and donations ---------- */
+/* ---------- community rules (same text as the app; agreed once before the first post or comment) ---------- */
+const rulesHtml = () => `<p>${h(RULES.intro)}</p><ol class="panel" style="padding:14px 14px 14px 34px">${RULES.rules.map((r) => `<li style="margin:6px 0"><b>${h(r.title)}.</b> ${h(r.body)}</li>`).join('')}</ol><p class="small muted">${h(RULES.enforcement)}</p>`;
+const rulesAgreed = () => { try { return Number(localStorage.getItem('pe.rulesAccepted') || 0) >= RULES.version; } catch { return false; } };
+function agreeToRules() {
+  if (rulesAgreed()) return Promise.resolve(true);
+  return new Promise((done) => {
+    const d = document.createElement('dialog');
+    d.className = 'panel'; d.style.maxWidth = '640px';
+    d.innerHTML = `<h2 style="margin-top:0">Community rules</h2>${rulesHtml()}<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" value="yes">I agree to the community rules</button><button class="btn ghost" value="no">Not now</button></div>`;
+    d.querySelectorAll('button').forEach((b) => b.onclick = () => d.close(b.value));
+    d.onclose = () => { const ok = d.returnValue === 'yes'; if (ok) { try { localStorage.setItem('pe.rulesAccepted', String(RULES.version)); } catch { /* private mode */ } } d.remove(); done(ok); };
+    document.body.append(d); d.showModal();
+  });
+}
+function viewRules() {
+  document.title = 'Community rules · The Phoenix Catalyst';
+  main().innerHTML = `<div class="detail"><h1>Community rules</h1>${rulesHtml()}</div>`;
+}
+
 function viewFaq() {
   document.title = 'Questions & answers · The Phoenix Catalyst';
   main().innerHTML = `<div class="detail"><h1>Questions &amp; answers</h1>${FAQ.map((s) => `<h2 style="margin-top:22px">${h(s.title)}</h2>${s.items.map((i) => `<details class="panel" style="margin:8px 0"><summary><b>${h(i.q)}</b></summary><p style="margin:10px 0 0">${h(i.a)}</p></details>`).join('')}`).join('')}
@@ -1559,7 +1580,7 @@ async function viewAbout() {
     return `<div class="panel gi"><span class="e" aria-hidden="true">${info.emoji}</span><div><h3>${h(info.title)}</h3><p class="small muted" style="margin:0">${h(st || info.blurb)}</p></div>
       ${done ? '' : `<a class="btn small" href="#/apply/${k}" aria-label="Apply: ${h(info.title)}">Apply</a>`}</div>`;
   }).join('') + (isAdmin() ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '')
-    + '<a class="btn ghost" href="#/sources">Suggest a local organization’s calendar</a> <a class="btn quiet" href="#/faq">Questions &amp; answers</a>';
+    + '<a class="btn ghost" href="#/sources">Suggest a local organization’s calendar</a> <a class="btn quiet" href="#/faq">Questions &amp; answers</a> <a class="btn quiet" href="#/rules">Community rules</a>';
 }
 
 /* ---------- donations: how often → how much → card or PayPal (same flow as the website) ---------- */
@@ -1699,7 +1720,7 @@ async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, id] = hash.split('/');
   document.title = 'The Phoenix Catalyst';
-  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about', sources: 'about', faq: 'about' }[page] ?? '';
+  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about', sources: 'about', faq: 'about', rules: 'about' }[page] ?? '';
   document.querySelectorAll('.tabs a').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
   try {
@@ -1715,6 +1736,7 @@ async function route() {
     else if (page === 'applications') await viewApplications();
     else if (page === 'sources') await viewSources();
     else if (page === 'faq') viewFaq();
+    else if (page === 'rules') viewRules();
     else await viewCalendar();
   } catch (e) {
     main().innerHTML = `<div class="empty"><h2>Something went wrong</h2><p>${h(errText(e))}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;

@@ -10,6 +10,7 @@ import { recall, sb, store } from './supabase';
 const TASK = 'phoenix-leader-alerts';
 const SEEN = 'pe.seenApplications';
 const SEEN_BOT = 'pe.seenBotHides';
+const URGENT = ['child_safety', 'violence', 'self_harm'];
 const VERB: Record<AppKind, string> = { volunteer: 'wants to volunteer', organizer: 'applied to organize events', moderator: 'applied to moderate' };
 
 /** Notifies about applications the admin hasn't been told about yet. Returns how many were new. */
@@ -43,7 +44,10 @@ export async function checkPendingApplications(): Promise<number> {
 export async function checkBotHides(): Promise<number> {
   const { data, error } = await sb.rpc('phoenix_bot_queue');
   if (error || !data) return 0;
-  const hidden = (data as { review_id: string; verdict: string; target_kind: string; reason: string | null }[]).filter((b) => b.verdict === 'hide');
+  // Child safety, threats and self-harm are urgent even when Phoenix Bot is only unsure
+  const rows = data as { review_id: string; verdict: string; target_kind: string; reason: string | null; categories: string[] }[];
+  const urgent = (b: { categories: string[] }) => b.categories.some((c) => URGENT.includes(c));
+  const hidden = rows.filter((b) => b.verdict === 'hide' || urgent(b));
   const seen = new Set(recall<string[]>(SEEN_BOT, []));
   const fresh = hidden.filter((b) => !seen.has(b.review_id));
   store(SEEN_BOT, hidden.map((b) => b.review_id));
@@ -51,7 +55,14 @@ export async function checkBotHides(): Promise<number> {
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('moderation', { name: 'Posts Phoenix Bot hid', importance: Notifications.AndroidImportance.HIGH });
   }
-  const one = fresh[0];
+  const one = fresh.find(urgent) ?? fresh[0];
+  if (urgent(one)) {
+    await Notifications.scheduleNotificationAsync({
+      content: { title: `Urgent: ${one.categories.filter((c) => URGENT.includes(c)).map((c) => c.replace('_', ' ')).join(', ')} report`, body: `${one.reason ?? 'Phoenix Bot flagged a post.'} Review it now. If anyone is in immediate danger, call 911.`, data: { url: '/moderate' } },
+      trigger: Platform.OS === 'android' ? { channelId: 'moderation' } : null,
+    });
+    return fresh.length;
+  }
   await Notifications.scheduleNotificationAsync({
     content: fresh.length === 1
       ? { title: `Phoenix Bot hid a ${one.target_kind}`, body: `${one.reason ?? 'It looked like a problem.'} Tap to clear it or confirm.`, data: { url: '/moderate' } }

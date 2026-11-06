@@ -71,6 +71,7 @@ function Shell() {
         <Stack.Screen name="admin" options={{ title: 'Team roles' }} />
         <Stack.Screen name="sources" options={{ title: 'Local organizations' }} />
         <Stack.Screen name="faq" options={{ title: 'Questions & answers' }} />
+        <Stack.Screen name="rules" options={{ title: 'Community rules' }} />
       </Stack>
     </>
   );

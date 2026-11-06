@@ -42,7 +42,7 @@ export default function Moderate() {
       <Txt v="small" style={{ marginBottom: 10 }}>Phoenix Bot checks every new post and comment. It hides obvious problems until you decide, and asks about anything it isn’t sure of.</Txt>
       {bot.length ? bot.map((b) => (
         <Card key={b.review_id} style={{ marginBottom: 10, gap: 8 }}>
-          <Txt v="kicker" color={b.verdict === 'hide' ? p.danger : p.focus}>{b.verdict === 'hide' ? 'HIDDEN BY PHOENIX BOT' : 'PHOENIX BOT ISN’T SURE'} · {b.target_kind === 'event' ? 'EVENT' : 'COMMENT'}</Txt>
+          <Txt v="kicker" color={b.verdict === 'hide' ? p.danger : p.focus}>{b.categories.some((c) => ['child_safety', 'violence', 'self_harm'].includes(c)) ? 'URGENT · ' : ''}{b.verdict === 'hide' ? 'HIDDEN BY PHOENIX BOT' : 'PHOENIX BOT ISN’T SURE'} · {b.target_kind === 'event' ? 'EVENT' : 'COMMENT'}</Txt>
           <Txt v="bold">{b.target_kind === 'event' ? b.title : `On “${b.title ?? 'an event'}”`}</Txt>
           {!!b.body && <Txt numberOfLines={4}>{b.body}</Txt>}
           <Txt v="small">by @{b.username ?? '?'} · {fmtShort(b.created_at)}</Txt>
