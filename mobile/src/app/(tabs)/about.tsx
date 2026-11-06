@@ -79,6 +79,7 @@ export default function About() {
           <Button kind="quiet" icon="group" title={waiting ? `Review applications (${waiting})` : 'Review applications'} onPress={() => router.push('/applications')} />
         )}
         <Button kind="ghost" icon="add" title="Suggest a local organization’s calendar" onPress={() => router.push('/sources')} />
+        <Button kind="quiet" icon="help" title="Questions & answers" onPress={() => router.push('/faq')} />
       </View>
 
       <Txt v="h2" style={{ marginTop: 26 }}>What we do</Txt>

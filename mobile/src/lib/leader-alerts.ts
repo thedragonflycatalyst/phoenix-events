@@ -9,6 +9,7 @@ import { recall, sb, store } from './supabase';
 
 const TASK = 'phoenix-leader-alerts';
 const SEEN = 'pe.seenApplications';
+const SEEN_BOT = 'pe.seenBotHides';
 const VERB: Record<AppKind, string> = { volunteer: 'wants to volunteer', organizer: 'applied to organize events', moderator: 'applied to moderate' };
 
 /** Notifies about applications the admin hasn't been told about yet. Returns how many were new. */
@@ -38,8 +39,30 @@ export async function checkPendingApplications(): Promise<number> {
   return fresh.length;
 }
 
+/** Notifies moderators and admins when Phoenix Bot hid something that's waiting for a human. */
+export async function checkBotHides(): Promise<number> {
+  const { data, error } = await sb.rpc('phoenix_bot_queue');
+  if (error || !data) return 0;
+  const hidden = (data as { review_id: string; verdict: string; target_kind: string; reason: string | null }[]).filter((b) => b.verdict === 'hide');
+  const seen = new Set(recall<string[]>(SEEN_BOT, []));
+  const fresh = hidden.filter((b) => !seen.has(b.review_id));
+  store(SEEN_BOT, hidden.map((b) => b.review_id));
+  if (!fresh.length || !(await Notifications.getPermissionsAsync()).granted) return fresh.length;
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('moderation', { name: 'Posts Phoenix Bot hid', importance: Notifications.AndroidImportance.HIGH });
+  }
+  const one = fresh[0];
+  await Notifications.scheduleNotificationAsync({
+    content: fresh.length === 1
+      ? { title: `Phoenix Bot hid a ${one.target_kind}`, body: `${one.reason ?? 'It looked like a problem.'} Tap to clear it or confirm.`, data: { url: '/moderate' } }
+      : { title: `Phoenix Bot hid ${fresh.length} posts`, body: 'They wait for you in Review posts. Tap to review.', data: { url: '/moderate' } },
+    trigger: Platform.OS === 'android' ? { channelId: 'moderation' } : null,
+  });
+  return fresh.length;
+}
+
 TaskManager.defineTask(TASK, async () => {
-  try { await checkPendingApplications(); return BackgroundTask.BackgroundTaskResult.Success; }
+  try { await checkBotHides(); await checkPendingApplications(); return BackgroundTask.BackgroundTaskResult.Success; }
   catch { return BackgroundTask.BackgroundTaskResult.Failed; }
 });
 
@@ -52,5 +75,6 @@ export async function setLeaderAlerts(isAdmin: boolean) {
     if (!perm.granted && perm.canAskAgain) await Notifications.requestPermissionsAsync();
     if (!on) await BackgroundTask.registerTaskAsync(TASK, { minimumInterval: 15 });
     await checkPendingApplications();
+    await checkBotHides();
   } catch { /* background tasks unavailable (e.g. emulator without Play services) */ }
 }

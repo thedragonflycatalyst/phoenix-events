@@ -101,6 +101,7 @@ export default function Mine() {
         </Card>
       )}
       <Feeds />
+      <Button kind="quiet" icon="help" title="Questions & answers" style={{ marginTop: 20 }} onPress={() => router.push('/faq')} />
       <Button kind="ghost" icon="logout" title="Sign out" style={{ marginTop: 24 }} onPress={async () => { await app.signOut(); toast('Signed out'); }} />
     </ScrollView>
   );

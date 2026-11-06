@@ -21,9 +21,9 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function Shell() {
   const p = usePalette();
-  const { ready, isAdmin, user } = useApp();
-  // Admins get a phone notification when new applications come in
-  useEffect(() => { if (ready) void setLeaderAlerts(isAdmin); }, [ready, isAdmin, user?.id]);
+  const { ready, isAdmin, isMod, user } = useApp();
+  // Admins hear about new applications; moderators and admins about posts Phoenix Bot hid
+  useEffect(() => { if (ready) void setLeaderAlerts(isAdmin || isMod); }, [ready, isAdmin, isMod, user?.id]);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => { if (s === 'active' && isAdmin) void checkPendingApplications(); });
     return () => sub.remove();
@@ -70,6 +70,7 @@ function Shell() {
         <Stack.Screen name="moderate" options={{ title: 'Review posts' }} />
         <Stack.Screen name="admin" options={{ title: 'Team roles' }} />
         <Stack.Screen name="sources" options={{ title: 'Local organizations' }} />
+        <Stack.Screen name="faq" options={{ title: 'Questions & answers' }} />
       </Stack>
     </>
   );

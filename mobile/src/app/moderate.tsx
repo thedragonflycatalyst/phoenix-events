@@ -11,6 +11,7 @@ import { listBans, unbanUser, type Ban } from '@/lib/safety';
 import { sb } from '@/lib/supabase';
 import { usePalette } from '@/lib/theme';
 
+type BotItem = { review_id: string; target_kind: 'event' | 'comment'; target_id: string; verdict: 'unsure' | 'hide'; categories: string[]; reason: string | null; created_at: string; title: string | null; body: string | null; username: string | null; event_id: string | null };
 type Flag = { flag_id: string; event_id: string; title: string; reason: string; flagged_by: string | null; created_at: string };
 
 export default function Moderate() {
@@ -19,12 +20,14 @@ export default function Moderate() {
   const { isMod, bump } = useApp();
   const [queue, setQueue] = useState<PEvent[]>([]);
   const [flags, setFlags] = useState<Flag[]>([]);
+  const [bot, setBot] = useState<BotItem[]>([]);
   const load = useCallback(async () => {
-    const [q, f] = await Promise.all([
+    const [q, f, b] = await Promise.all([
       sb.from('phoenix_events').select('*').is('reviewed_at', null).order('created_at', { ascending: false }).limit(100),
       sb.rpc('phoenix_open_flags'),
+      sb.rpc('phoenix_bot_queue'),
     ]);
-    setQueue((q.data ?? []) as PEvent[]); setFlags((f.data ?? []) as Flag[]);
+    setQueue((q.data ?? []) as PEvent[]); setFlags((f.data ?? []) as Flag[]); setBot((b.data ?? []) as BotItem[]);
   }, []);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const act = async (fn: () => PromiseLike<{ error: { message: string } | null }>, msg: string) => {
@@ -35,6 +38,21 @@ export default function Moderate() {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <Txt v="small" style={{ fontSize: 16, marginBottom: 16 }}>Posts go live right away. Check that each one is real, local and kind. Hide anything unclear and remove spam or harmful posts.</Txt>
+      <Txt v="h2" style={{ marginBottom: 4 }}>Phoenix Bot ({bot.length})</Txt>
+      <Txt v="small" style={{ marginBottom: 10 }}>Phoenix Bot checks every new post and comment. It hides obvious problems until you decide, and asks about anything it isn’t sure of.</Txt>
+      {bot.length ? bot.map((b) => (
+        <Card key={b.review_id} style={{ marginBottom: 10, gap: 8 }}>
+          <Txt v="kicker" color={b.verdict === 'hide' ? p.danger : p.focus}>{b.verdict === 'hide' ? 'HIDDEN BY PHOENIX BOT' : 'PHOENIX BOT ISN’T SURE'} · {b.target_kind === 'event' ? 'EVENT' : 'COMMENT'}</Txt>
+          <Txt v="bold">{b.target_kind === 'event' ? b.title : `On “${b.title ?? 'an event'}”`}</Txt>
+          {!!b.body && <Txt numberOfLines={4}>{b.body}</Txt>}
+          <Txt v="small">by @{b.username ?? '?'} · {fmtShort(b.created_at)}</Txt>
+          {!!b.reason && <Txt v="small" color={p.ink}>Why: {b.reason}{b.categories.length ? ` (${b.categories.join(', ').replace(/_/g, ' ')})` : ''}</Txt>}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Button small title={b.verdict === 'hide' ? 'It’s fine, put it back' : 'It’s fine'} onPress={() => act(() => sb.rpc('phoenix_bot_decide', { p_review: b.review_id, p_decision: 'cleared' }), b.verdict === 'hide' ? 'Put back' : 'Cleared')} />
+            <Button small kind="danger" title="Remove it" onPress={() => act(() => sb.rpc('phoenix_bot_decide', { p_review: b.review_id, p_decision: 'confirmed' }), 'Removed')} />
+          </View>
+        </Card>
+      )) : <Txt v="small" style={{ marginBottom: 16 }}>Nothing from Phoenix Bot to check.</Txt>}
       <Txt v="h2" style={{ marginBottom: 10 }}>Reports ({flags.length})</Txt>
       {flags.length ? flags.map((f) => (
         <Card key={f.flag_id} style={{ marginBottom: 10 }}>

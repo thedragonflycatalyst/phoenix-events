@@ -53,7 +53,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:ocr": "node --experimental-strip-types src/lib/ocr/parse.test.ts"
+    "test:ocr": "node --experimental-strip-types src/lib/ocr/parse.test.ts && node --experimental-strip-types scripts/sync-faq.mjs --check"
   },
   "private": true
 }

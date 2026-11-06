@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
 import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=23';
 import { readPoster, compressImage } from './ocr.js?v=23';
+import { FAQ } from './faq.js?v=23';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -1125,25 +1126,68 @@ async function viewAdd() {
     const poster = await compressImage(file).catch(() => null);
     if (!poster) { toast('That photo couldn’t be opened. Try another.'); return; }
     const preview = URL.createObjectURL(poster);
-    work.innerHTML = `<div class="scanprev"><img src="${preview}" alt="Your poster photo"><div><b>Reading the poster…</b>
-      <p class="small muted">This runs on your phone and is free. The first scan downloads the reader, so it can take a moment.</p><progress id="prog" max="1" value="0"></progress></div></div>`;
+    const status = (title, note, bar) => { work.innerHTML = `<div class="scanprev"><img src="${preview}" alt="Your poster photo"><div><b>${title}</b>
+      <p class="small muted">${note}</p>${bar ? '<progress id="prog" max="1" value="0"></progress>' : ''}</div></div>`; };
+    status('Reading the flyer carefully…', 'Only what’s printed on the flyer is copied. Anything unclear is left for you to fill in.');
     work.scrollIntoView({ behavior: 'smooth' });
-    let found = {};
-    try {
-      found = await readPoster(poster, (p) => { const pr = $('#prog'); if (pr) pr.value = p; });
-    } catch (e) { toast(errText(e)); }
+    let found = await aiFlyer(poster, () => status('Checking the event online…', 'Looking for the organizer’s page to confirm the place and details.'));
+    if (!found) {
+      status('Reading the poster…', 'This runs on your phone and is free. The first scan downloads the reader, so it can take a moment.', true);
+      try { found = await readPoster(poster, (p) => { const pr = $('#prog'); if (pr) pr.value = p; }); } catch (e) { toast(errText(e)); found = {}; }
+    }
     const pre = {
       title: found.title, category: found.category, location_name: found.location_name, address: found.address, url: found.url, cost: found.cost, organizer: found.organizer || '',
       description: found.description, all_day: !!found.allDay,
       starts_at: found.start ? found.start.toISOString() : null, ends_at: found.end ? found.end.toISOString() : null,
     };
     const got = [found.title && 'name', found.start && 'date', found.location_name || found.address ? 'place' : ''].filter(Boolean);
+    const checked = found.summary ? `<p class="small ${found.verification?.status === 'confirmed' ? '' : 'muted'}">${h(found.summary)}</p>${(found.verification?.sources ?? []).slice(0, 2).map((x) => `<a class="small" href="${h(x.url)}" target="_blank" rel="noopener">${h(x.title || x.url)}</a>`).join('<br>')}` : '<p class="small muted">Check everything below. Posters can be tricky to read.</p>';
     work.innerHTML = `<div class="scanprev"><img src="${preview}" alt="Your poster photo"><div><b>${got.length ? `Found the ${got.join(', ')}` : 'We couldn’t read much from this one'}</b>
-      <p class="small muted">Check everything below. Posters can be tricky to read.</p></div></div>` + eventForm(pre);
+      ${checked}</div></div>` + eventForm(pre);
     wireEventForm(null, { poster });
   };
   $('#snap').onchange = (e) => onFile(e.target.files[0]);
   $('#pick').onchange = (e) => onFile(e.target.files[0]);
+}
+
+/* ---------- careful flyer reading (AI read + web check on phoenix-scan; null falls back to the free reader) ---------- */
+const FIELD_NAMES = { title: 'name', start: 'start time', end: 'end time', location_name: 'place', address: 'address', url: 'link', organizer: 'organizer', cost: 'cost', category: 'category', description: 'details' };
+const localDate = (v) => { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/); return m ? new Date(+m[1], m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : null; };
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+function mergeFlyer(g, e) {
+  const out = { ...g };
+  if (e.start) { out.start = localDate(e.start); out.allDay = e.all_day ?? e.start.length === 10; out.startText = e.start; }
+  if (e.end) { out.end = localDate(e.end); out.endText = e.end; }
+  for (const k of ['title', 'location_name', 'address', 'url', 'organizer', 'description', 'cost', 'category']) if (e[k]) out[k] = e[k];
+  return out;
+}
+async function aiFlyer(blob, onChecking) {
+  if (!state.user) return null;
+  try {
+    const image = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(blob); });
+    const read = await sb.functions.invoke('phoenix-scan', { body: { step: 'read', image } });
+    if (read.error || !read.data?.event) return null;
+    let g = mergeFlyer({ cost: 'free', category: 'community' }, read.data.event);
+    const unclear = read.data.unclear || [];
+    if (read.data.is_event === false || !g.title) return { ...g, summary: '' };
+    onChecking?.();
+    const event = { ...read.data.event };
+    const ver = await sb.functions.invoke('phoenix-scan', { body: { step: 'verify', event } });
+    const v = ver.data?.verification;
+    if (ver.error || !v) return { ...g, summary: unclear.length ? `Couldn’t read the ${unclear.map((f) => FIELD_NAMES[f] || f).join(', ')} clearly, so fill ${unclear.length > 1 ? 'those' : 'that'} in.` : '' };
+    const fixes = v.fixes || {};
+    const filled = Object.keys(fixes).filter((k) => k !== 'all_day' && fixes[k]);
+    g = mergeFlyer(g, fixes);
+    const site = hostOf(v.sources?.[0]?.url);
+    const left = unclear.filter((f) => !filled.includes(f)).map((f) => FIELD_NAMES[f] || f);
+    const look = left.length ? ` Couldn’t read the ${left.join(', ')} clearly on the flyer, so fill ${left.length > 1 ? 'those' : 'that'} in.` : '';
+    const fill = filled.length ? ` Filled in the ${filled.map((f) => FIELD_NAMES[f] || f).join(', ')} from ${site}.` : '';
+    const summary = v.status === 'conflict' ? `Check this: ${(v.conflicts || []).map((c) => `${FIELD_NAMES[c.field] || c.field}: flyer says “${c.flyer}”, ${site || 'the web'} says “${c.web}”`).join('; ')}.${fill}${look}`
+      : v.status === 'confirmed' ? `✓ Matches ${site}.${fill}${look}`
+      : v.status === 'partly' ? `Partly confirmed on ${site}.${fill}${look}`
+      : `Couldn’t find this event online, so double-check the details against the flyer.${look}`;
+    return { ...g, verification: v, summary };
+  } catch { return null; }
 }
 
 async function viewEdit(id) {
@@ -1238,13 +1282,22 @@ async function viewModerate() {
   const root = main();
   if (!isMod()) { root.innerHTML = '<div class="empty detail"><h2>For volunteer moderators</h2><p>Ask a Phoenix Catalyst admin if you’d like to help review posts.</p></div>'; return; }
   root.innerHTML = '<p class="muted pad">Loading…</p>';
-  const [q, flags, bans] = await Promise.all([
+  const [q, flags, bans, bot] = await Promise.all([
     sb.from('phoenix_events').select('*').is('reviewed_at', null).order('created_at', { ascending: false }).limit(100),
     sb.rpc('phoenix_open_flags'),
     sb.rpc('phoenix_list_bans'),
+    sb.rpc('phoenix_bot_queue'),
   ]);
+  const botItems = bot.data || [];
   root.innerHTML = `<div class="detail"><h1>Review posts</h1>
     <p class="muted" style="margin-top:8px">Community posts go live right away. Check that each one is real, local, and kind. Hide anything unclear and remove spam or harmful posts.</p>
+    <h2 style="margin:20px 0 4px">Phoenix Bot (${botItems.length})</h2>
+    <p class="small muted" style="margin:0 0 10px">Phoenix Bot checks every new post and comment. It hides obvious problems until you decide, and asks about anything it isn’t sure of.</p>
+    ${botItems.length ? `<ul class="list-plain">${botItems.map((b) => `<li><span class="small" style="font-weight:700;color:${b.verdict === 'hide' ? 'var(--danger, #c42b20)' : 'inherit'}">${b.verdict === 'hide' ? 'Hidden by Phoenix Bot' : 'Phoenix Bot isn’t sure'} · ${b.target_kind}</span>
+      <br>${b.event_id ? `<a href="#/event/${b.event_id}"><b>${h(b.target_kind === 'event' ? b.title || '' : `On “${b.title || 'an event'}”`)}</b></a>` : `<b>${h(b.title || '')}</b>`}
+      ${b.body ? `<br><span class="small">${h(String(b.body).slice(0, 300))}</span>` : ''}
+      <br><span class="small muted">by @${h(b.username || '?')} · ${h(fmtShort(b.created_at))}${b.reason ? ` · Why: ${h(b.reason)}` : ''}</span>
+      <br><button class="btn small" data-bot="${b.review_id}" data-d="cleared">${b.verdict === 'hide' ? 'It’s fine, put it back' : 'It’s fine'}</button> <button class="btn small danger" data-bot="${b.review_id}" data-d="confirmed">Remove it</button></li>`).join('')}</ul>` : '<p class="muted">Nothing from Phoenix Bot to check.</p>'}
     <h2 style="margin:20px 0 10px">Reports from users (${(flags.data || []).length})</h2>
     ${(flags.data || []).length ? `<ul class="list-plain">${flags.data.map((f) => `<li><a href="#/event/${f.event_id}"><b>${h(f.title)}</b></a>
       <br><span class="small">“${h(f.reason)}” by @${h(f.flagged_by || 'unknown')}, ${h(fmtShort(f.created_at))}</span>
@@ -1258,6 +1311,10 @@ async function viewModerate() {
       <button class="btn small" data-ok="${e.id}">Looks good</button><button class="btn small quiet" data-st="${e.id}" data-v="hidden">Hide</button>
       <button class="btn small danger" data-st="${e.id}" data-v="removed">Remove</button><span class="small muted">by @${h(e.created_by_username || '?')}${e.status !== 'published' ? ` · ${h(e.status)}` : ''}</span></div>`).join('')
       : '<p class="muted">You’re all caught up.</p>'}</div>`;
+  root.querySelectorAll('[data-bot]').forEach((b) => b.onclick = async () => {
+    const { error } = await sb.rpc('phoenix_bot_decide', { p_review: b.dataset.bot, p_decision: b.dataset.d });
+    if (error) toast(errText(error)); else { toast(b.dataset.d === 'cleared' ? 'Cleared' : 'Removed'); viewModerate(); }
+  });
   root.querySelectorAll('[data-lift]').forEach((b) => b.onclick = async () => {
     const { error } = await sb.rpc('phoenix_unban_user', { p_username: b.dataset.lift });
     if (error) toast(errText(error)); else { toast('Suspension lifted'); viewModerate(); }
@@ -1458,6 +1515,12 @@ async function viewApplications() {
 }
 
 /* ---------- about: volunteer hub, mission and donations ---------- */
+function viewFaq() {
+  document.title = 'Questions & answers · Phoenix Community Calendar';
+  main().innerHTML = `<div class="detail"><h1>Questions &amp; answers</h1>${FAQ.map((s) => `<h2 style="margin-top:22px">${h(s.title)}</h2>${s.items.map((i) => `<details class="panel" style="margin:8px 0"><summary><b>${h(i.q)}</b></summary><p style="margin:10px 0 0">${h(i.a)}</p></details>`).join('')}`).join('')}
+    <p class="small muted" style="margin-top:22px">Still have a question? Email <a href="mailto:ThePhoenixCatalyst@outlook.com">ThePhoenixCatalyst@outlook.com</a></p></div>`;
+}
+
 async function viewAbout() {
   const shifts = [...state.rsvps.values()].filter((k) => k === 'volunteer').length;
   main().innerHTML = `<div class="detail">
@@ -1496,7 +1559,7 @@ async function viewAbout() {
     return `<div class="panel gi"><span class="e" aria-hidden="true">${info.emoji}</span><div><h3>${h(info.title)}</h3><p class="small muted" style="margin:0">${h(st || info.blurb)}</p></div>
       ${done ? '' : `<a class="btn small" href="#/apply/${k}" aria-label="Apply: ${h(info.title)}">Apply</a>`}</div>`;
   }).join('') + (isAdmin() ? `<a class="btn quiet" href="#/applications">Review applications${pending.count ? ` (${pending.count})` : ''}</a>` : '')
-    + '<a class="btn ghost" href="#/sources">Suggest a local organization’s calendar</a>';
+    + '<a class="btn ghost" href="#/sources">Suggest a local organization’s calendar</a> <a class="btn quiet" href="#/faq">Questions &amp; answers</a>';
 }
 
 /* ---------- donations: how often → how much → card or PayPal (same flow as the website) ---------- */
@@ -1636,7 +1699,7 @@ async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, id] = hash.split('/');
   document.title = 'Phoenix Community Calendar';
-  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about', sources: 'about' }[page] ?? '';
+  const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about', sources: 'about', faq: 'about' }[page] ?? '';
   document.querySelectorAll('.tabs a').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);
   try {
@@ -1651,6 +1714,7 @@ async function route() {
     else if (page === 'apply') await viewApply(id);
     else if (page === 'applications') await viewApplications();
     else if (page === 'sources') await viewSources();
+    else if (page === 'faq') viewFaq();
     else await viewCalendar();
   } catch (e) {
     main().innerHTML = `<div class="empty"><h2>Something went wrong</h2><p>${h(errText(e))}</p><button class="btn" onclick="location.reload()">Reload</button></div>`;

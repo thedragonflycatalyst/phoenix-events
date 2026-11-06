@@ -15,6 +15,7 @@ import { fmtShort, fmtTime } from '@/lib/dates';
 import type { PosterGuess } from '@/lib/ocr/parse';
 import { looksLikeEvent, scanKey, setPendingScan, type Scan } from '@/lib/ocr/pending';
 import { withWebDetails } from '@/lib/ocr/enrich';
+import { aiRead, aiVerify, checkSummary, type Flyer } from '@/lib/ocr/ai';
 import { readPoster, shrinkPhoto } from '@/lib/ocr/read';
 import type { PEvent } from '@/lib/model';
 import { addScanToPhoneCalendar, addToPhoneCalendar } from '@/lib/phone';
@@ -46,20 +47,41 @@ export default function ScanScreen() {
   const [manual, setManual] = useState(false);
   const [saved, setSaved] = useState<'idle' | 'busy' | 'added' | 'already' | 'denied' | 'no-calendar'>('idle');
   const [dupe, setDupe] = useState<PEvent | null>(null);
+  // The careful read: 'reading' the flyer with AI, then 'checking' it online
+  const [stage, setStage] = useState<'reading' | 'checking' | 'done'>('done');
+  const presentId = useRef(0);
   const busy = useRef(false);
   const lastRead = useRef<Scan | null>(null);
 
   /** Shows the "looks like an event" sheet, first checking whether it's already on the Phoenix calendar. */
   const present = async (scan: Scan, sure: boolean) => {
+    const run = ++presentId.current;
     setSaved('idle'); setDupe(null);
     setFound({ ...scan, sure });
-    const g = scan.guess;
-    if (!g.start) return;
-    const { data } = await sb.rpc('phoenix_find_duplicates', { p_title: g.title, p_starts_at: g.start.toISOString(), p_address: g.address || null });
-    const id = (data as { id: string }[] | null)?.[0]?.id;
-    if (!id) return;
-    const { data: ev } = await sb.from('phoenix_events').select('*').eq('id', id).maybeSingle();
-    if (ev) setDupe(ev as PEvent);
+    const findDupe = async (g: Flyer) => {
+      if (!g.start) return;
+      const { data } = await sb.rpc('phoenix_find_duplicates', { p_title: g.title, p_starts_at: g.start.toISOString(), p_address: g.address || null });
+      const id = (data as { id: string }[] | null)?.[0]?.id;
+      if (!id || run !== presentId.current) return;
+      const { data: ev } = await sb.from('phoenix_events').select('*').eq('id', id).maybeSingle();
+      if (ev && run === presentId.current) setDupe(ev as PEvent);
+    };
+    void findDupe(scan.guess);
+    // The phone's quick read found it; now read it carefully and check it online
+    if (!user) return;
+    setStage('reading');
+    const ai = await aiRead(scan.uri);
+    if (run !== presentId.current) return;
+    if (!ai) { setStage('done'); return; }
+    const read = ai.guess;
+    setFound({ ...scan, guess: read, sure: ai.isEvent && read.dateSure });
+    void findDupe(read);
+    if (!ai.isEvent || !read.title) { setStage('done'); return; }
+    setStage('checking');
+    const checked = await aiVerify(read);
+    if (run !== presentId.current) return;
+    if (checked) { setFound({ ...scan, guess: checked, sure: checked.dateSure && !!checked.start }); void findDupe(checked); }
+    setStage('done');
   };
 
   useEffect(() => { const s = AppState.addEventListener('change', (st) => setAppActive(st === 'active')); return () => s.remove(); }, []);
@@ -127,14 +149,16 @@ export default function ScanScreen() {
     } finally { setManual(false); }
   };
 
-  const close = () => { if (found) forget(found.uri); if (router.canGoBack()) router.back(); else router.replace('/'); };
-  const rescan = () => { if (found) forget(found.uri); setFound(null); setDupe(null); };
+  const close = () => { presentId.current++; if (found) forget(found.uri); if (router.canGoBack()) router.back(); else router.replace('/'); };
+  const rescan = () => { presentId.current++; setStage('done'); if (found) forget(found.uri); setFound(null); setDupe(null); };
   const post = async (alsoPhone: boolean) => {
     if (!found) return;
     if (!user) { router.push('/sign-in'); return; }
     // Look up the event's own page for real details before filling the form
     setManual(true);
-    const guess = await withWebDetails(found.guess).finally(() => setManual(false));
+    const g = found.guess as Flyer;
+    const guess = g.reader === 'ai' ? g : await withWebDetails(found.guess).finally(() => setManual(false));
+    setManual(false);
     setPendingScan({ uri: found.uri, guess, alsoPhone });
     setFound(null);
     router.dismissTo('/add');
@@ -210,6 +234,7 @@ export default function ScanScreen() {
               {!!(found.guess.location_name || found.guess.address) && <Text style={[st.body, { color: p.muted }]} numberOfLines={2}>{[found.guess.location_name, found.guess.address].filter(Boolean).join(', ')}</Text>}
             </View>
           </View>
+          <CheckLine stage={stage} guess={found.guess as Flyer} />
           {dupe ? (
             <>
               <Text style={[st.body, { color: p.ink, marginTop: 16, fontFamily: F.bodyBold }]}>This event is already on the Phoenix calendar.</Text>
@@ -227,11 +252,11 @@ export default function ScanScreen() {
                   <Button icon="add" title="Sign in to post it" onPress={() => post(false)} />
                 ) : found.sure ? (
                   <>
-                    <Button icon="add" title="Add to Phoenix + my phone calendar" busy={manual} onPress={() => post(true)} />
-                    <Button kind="ghost" icon="public" title="Phoenix calendar only" busy={manual} onPress={() => post(false)} />
+                    <Button icon="add" title="Add to Phoenix + my phone calendar" busy={manual || stage !== 'done'} onPress={() => post(true)} />
+                    <Button kind="ghost" icon="public" title="Phoenix calendar only" busy={manual || stage !== 'done'} onPress={() => post(false)} />
                   </>
                 ) : (
-                  <Button icon="add" title="Fill in the details" busy={manual} onPress={() => post(false)} />
+                  <Button icon="add" title="Fill in the details" busy={manual || stage !== 'done'} onPress={() => post(false)} />
                 )}
                 {found.sure && <Button kind="ghost" icon={phoneDone ? 'check' : 'calendar_month'} busy={saved === 'busy'} disabled={phoneDone} title={phoneTitle} onPress={toPhone} />}
                 <Button kind="quiet" icon="document_scanner" title="Keep scanning" onPress={rescan} />
@@ -240,6 +265,33 @@ export default function ScanScreen() {
           )}
         </View>
       )}
+    </View>
+  );
+}
+
+/** What the careful read is doing, then what it found online, with the sources to open. */
+function CheckLine({ stage, guess }: { stage: 'reading' | 'checking' | 'done'; guess: Flyer }) {
+  const p = usePalette();
+  if (stage !== 'done') {
+    return (
+      <View style={[st.row, { gap: 10, marginTop: 14 }]}>
+        <ActivityIndicator color={p.focus} size="small" />
+        <Text style={[st.body, { color: p.muted }]}>{stage === 'reading' ? 'Reading the flyer carefully…' : 'Checking the event online…'}</Text>
+      </View>
+    );
+  }
+  const text = checkSummary(guess);
+  if (!text) return null;
+  const v = guess.verification;
+  const tone = v?.status === 'confirmed' ? p.good : v?.status === 'conflict' || v?.status === 'not_found' ? p.focus : p.muted;
+  return (
+    <View style={{ marginTop: 14, gap: 6 }}>
+      <Text style={[st.body, { color: tone }]}>{v?.status === 'confirmed' ? '✓ ' : v?.status === 'conflict' ? '⚠ ' : ''}{text}</Text>
+      {(v?.sources ?? []).slice(0, 2).map((src) => (
+        <Pressable key={src.url} accessibilityRole="link" onPress={() => { void Linking.openURL(src.url); }} hitSlop={6}>
+          <Text style={[st.body, { color: p.focus, textDecorationLine: 'underline', fontSize: 14 }]} numberOfLines={1}>{src.title || src.url}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
