@@ -33,7 +33,7 @@ export async function checkPendingApplications(): Promise<number> {
   await Notifications.scheduleNotificationAsync({
     content: fresh.length === 1
       ? { title: `New ${KINDS[one.kind].title.toLowerCase()} application`, body: `@${one.username ?? 'Someone'} ${VERB[one.kind]}. Tap to review.`, data: { url: '/applications' } }
-      : { title: `${fresh.length} new applications`, body: `${pending.length} waiting for review in Phoenix Community. Tap to review.`, data: { url: '/applications' } },
+      : { title: `${fresh.length} new applications`, body: `${pending.length} waiting for review in The Phoenix Catalyst app. Tap to review.`, data: { url: '/applications' } },
     trigger: Platform.OS === 'android' ? { channelId: 'leaders' } : null,
   });
   return fresh.length;

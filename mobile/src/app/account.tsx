@@ -74,7 +74,7 @@ export default function Account() {
         </Pressable>
         <Txt v="h1" style={{ marginTop: 12 }}>{hasUsername ? app.username : 'Your account'}</Txt>
         <Txt v="small" style={{ fontSize: 15 }}>{email}</Txt>
-        <Txt v="small" center style={{ marginTop: 2 }}>Phoenix Community version {Constants.expoConfig?.version ?? 'dev'}</Txt>
+        <Txt v="small" center style={{ marginTop: 2 }}>The Phoenix Catalyst app, version {Constants.expoConfig?.version ?? 'dev'}</Txt>
       </View>
 
       {!verified && (

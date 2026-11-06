@@ -4,7 +4,7 @@ export const FAQ = [
   "title": "The basics",
   "items": [
    {
-    "q": "What is Phoenix Community?",
+    "q": "What is The Phoenix Catalyst app?",
     "a": "A free community events calendar from The Phoenix Catalyst, a nonprofit in Columbia, Maryland. Neighbors share local events, RSVP, volunteer and add events to their own calendars."
    },
    {

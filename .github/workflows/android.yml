@@ -106,11 +106,11 @@ jobs:
           NOTES="Version $APP_VERSION, built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC'). Open this page on your Android phone, download the .apk, and tap it to install (allow installing from your browser if asked)."
           # Numbered release for this build, kept so every version has its own link
           gh release create "android-v$N" "phoenix-community-v$N.apk" --prerelease --target "$GITHUB_SHA" \
-            --title "Phoenix Community – Android version $N" --notes "$NOTES"
+            --title "The Phoenix Catalyst – Android version $N" --notes "$NOTES"
           # Rolling "latest" release whose link never changes
           gh release delete android-preview --yes --cleanup-tag || true
           gh release create android-preview phoenix-community.apk "phoenix-community-v$N.apk" --prerelease --target "$GITHUB_SHA" \
-            --title "Phoenix Community – Android test build (latest: version $N)" --notes "$NOTES"
+            --title "The Phoenix Catalyst – Android test build (latest: version $N)" --notes "$NOTES"
           # Keep only the 10 newest numbered releases
           gh release list --limit 100 --json tagName --jq '.[].tagName' | grep '^android-v' | sort -t v -k2 -n -r | tail -n +11 | xargs -r -I{} gh release delete {} --yes --cleanup-tag
 

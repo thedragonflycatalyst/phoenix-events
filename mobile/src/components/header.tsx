@@ -14,7 +14,7 @@ export function TopBar() {
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <Image source={require('../../assets/icon.png')} style={{ width: 34, height: 34, borderRadius: 10 }} accessibilityIgnoresInvertColors />
-        <Text style={{ fontFamily: F.displayBold, fontSize: 18, color: p.ink }}>Phoenix <Text style={{ color: p.muted }}>Community</Text></Text>
+        <Text style={{ fontFamily: F.displayBold, fontSize: 18, color: p.ink }}>The Phoenix <Text style={{ color: p.muted }}>Catalyst</Text></Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Scan a flyer" onPress={() => router.push('/scan')} hitSlop={6}

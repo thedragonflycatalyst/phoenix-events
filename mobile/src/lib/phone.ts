@@ -28,7 +28,7 @@ export async function addToPhoneCalendar(e: PEvent): Promise<'added' | 'already'
     endDate: endOf(e),
     allDay: e.all_day,
     location: placeOf(e) || undefined,
-    notes: [e.description, e.organizer ? `Hosted by ${e.organizer}` : '', `Phoenix Community: ${shareUrl(e.id)}`].filter(Boolean).join('\n\n'),
+    notes: [e.description, e.organizer ? `Hosted by ${e.organizer}` : '', `The Phoenix Catalyst: ${shareUrl(e.id)}`].filter(Boolean).join('\n\n'),
     timeZone: e.timezone || 'America/New_York',
     alarms: [{ relativeOffset: -60 }],
   });

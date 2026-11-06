@@ -6,7 +6,7 @@ export const FAQ: FaqSection[] = [
   {
     title: 'The basics',
     items: [
-      { q: 'What is Phoenix Community?', a: 'A free community events calendar from The Phoenix Catalyst, a nonprofit in Columbia, Maryland. Neighbors share local events, RSVP, volunteer and add events to their own calendars.' },
+      { q: 'What is The Phoenix Catalyst app?', a: 'A free community events calendar from The Phoenix Catalyst, a nonprofit in Columbia, Maryland. Neighbors share local events, RSVP, volunteer and add events to their own calendars.' },
       { q: 'Does it cost anything?', a: 'No. The app and every feature in it are free. Donations to The Phoenix Catalyst keep it that way, but they are never required.' },
       { q: 'Do I need an account?', a: 'You can browse, search and use the map without one. You need a free Dragonfly account to post events, RSVP, volunteer, comment or apply. One account works across all Dragonfly apps.' },
     ],

@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=23';
-import { readPoster, compressImage } from './ocr.js?v=23';
-import { FAQ } from './faq.js?v=23';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=24';
+import { readPoster, compressImage } from './ocr.js?v=24';
+import { FAQ } from './faq.js?v=24';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -850,7 +850,7 @@ async function viewEvent(id) {
   const mine = state.user && e.created_by === state.user.id, rs = state.rsvps.get(e.id);
   const full = e.volunteer_slots && e.volunteer_count >= e.volunteer_slots;
   const place = [e.location_name, e.address].filter(Boolean).join(', ');
-  document.title = `${e.title} · Phoenix Community Calendar`;
+  document.title = `${e.title} · The Phoenix Catalyst`;
   const ico = (d) => `<span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg></span>`;
   const host = e.is_tpc ? 'Hosted by The Phoenix Catalyst' : e.organizer ? `Hosted by ${e.organizer}` : CAT[e.category]?.label;
   root.innerHTML = `<article class="detail" data-cat="${h(e.category)}">
@@ -1404,7 +1404,7 @@ async function viewApply(kind) {
     $('#si').onclick = () => authDialog('Sign in to apply.');
     return;
   }
-  document.title = `Apply: ${info.title} · Phoenix Community Calendar`;
+  document.title = `Apply: ${info.title} · The Phoenix Catalyst`;
   const chipBoxes = (name, list) => `<div class="chips wrap">${list.map((x) => `<label class="chip"><input type="checkbox" name="${name}" value="${h(x)}" style="accent-color:var(--ink)"> ${h(x)}</label>`).join('')}</div>`;
   root.innerHTML = `<div class="detail apply"><a href="#/about" class="back">‹ Phoenix</a>
     <div style="font-size:2.6rem" aria-hidden="true">${info.emoji}</div><h1>${h(info.title)}</h1>
@@ -1516,7 +1516,7 @@ async function viewApplications() {
 
 /* ---------- about: volunteer hub, mission and donations ---------- */
 function viewFaq() {
-  document.title = 'Questions & answers · Phoenix Community Calendar';
+  document.title = 'Questions & answers · The Phoenix Catalyst';
   main().innerHTML = `<div class="detail"><h1>Questions &amp; answers</h1>${FAQ.map((s) => `<h2 style="margin-top:22px">${h(s.title)}</h2>${s.items.map((i) => `<details class="panel" style="margin:8px 0"><summary><b>${h(i.q)}</b></summary><p style="margin:10px 0 0">${h(i.a)}</p></details>`).join('')}`).join('')}
     <p class="small muted" style="margin-top:22px">Still have a question? Email <a href="mailto:ThePhoenixCatalyst@outlook.com">ThePhoenixCatalyst@outlook.com</a></p></div>`;
 }
@@ -1698,7 +1698,7 @@ async function viewSources() {
 async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   const [page, id] = hash.split('/');
-  document.title = 'Phoenix Community Calendar';
+  document.title = 'The Phoenix Catalyst';
   const tab = { '': 'calendar', map: 'map', add: 'add', mine: 'mine', about: 'about', apply: 'about', sources: 'about', faq: 'about' }[page] ?? '';
   document.querySelectorAll('.tabs a').forEach((a) => { if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   window.scrollTo(0, 0);

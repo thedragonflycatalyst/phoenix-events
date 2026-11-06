@@ -122,7 +122,7 @@ function Feeds() {
   return (
     <Card style={{ marginTop: 20 }}>
       <Txt v="h3">Community calendars anyone can follow</Txt>
-      {row('All community events', `${CALENDAR_FN}?feed=all`, 'Phoenix Community Events')}
+      {row('All community events', `${CALENDAR_FN}?feed=all`, 'The Phoenix Catalyst events')}
       {row('Phoenix Catalyst volunteer events', `${CALENDAR_FN}?feed=tpc`, 'Phoenix Catalyst Volunteer Events')}
     </Card>
   );
