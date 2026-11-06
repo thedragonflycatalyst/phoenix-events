@@ -9,9 +9,11 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/ui';
+import { BiometricSecurityProvider } from '@/features/biometric-security';
+import { BiometricGate } from '@/features/biometric-gate';
 import { AppProvider, useApp } from '@/lib/app-state';
 import { checkPendingApplications, setLeaderAlerts } from '@/lib/leader-alerts';
-import { AppState } from 'react-native';
+import { AppState, View } from 'react-native';
 import { F, usePalette } from '@/lib/theme';
 
 // Links like phoenix:///scan open on top of the tabs, so Back always has somewhere to go
@@ -80,9 +82,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <ToastProvider>
-          <Shell />
-        </ToastProvider>
+        <BiometricSecurityProvider>
+          <ToastProvider>
+            <View style={{ flex: 1 }}>
+              <Shell />
+              <BiometricGate />
+            </View>
+          </ToastProvider>
+        </BiometricSecurityProvider>
       </AppProvider>
     </SafeAreaProvider>
   );
