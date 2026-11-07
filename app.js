@@ -1154,12 +1154,12 @@ async function viewAdd() {
 
 /* ---------- careful flyer reading (AI read + web check on phoenix-scan; null falls back to the free reader) ---------- */
 const FIELD_NAMES = { title: 'name', start: 'start time', end: 'end time', location_name: 'place', address: 'address', url: 'link', organizer: 'organizer', cost: 'cost', category: 'category', description: 'details' };
-const localDate = (v) => { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/); return m ? new Date(+m[1], m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : null; };
+const flyerDate = (v) => { const m = String(v || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?$/); return m ? new Date(+m[1], m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : null; };
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 function mergeFlyer(g, e) {
   const out = { ...g };
-  if (e.start) { out.start = localDate(e.start); out.allDay = e.all_day ?? e.start.length === 10; out.startText = e.start; }
-  if (e.end) { out.end = localDate(e.end); out.endText = e.end; }
+  if (e.start) { out.start = flyerDate(e.start); out.allDay = e.all_day ?? e.start.length === 10; out.startText = e.start; }
+  if (e.end) { out.end = flyerDate(e.end); out.endText = e.end; }
   for (const k of ['title', 'location_name', 'address', 'url', 'organizer', 'description', 'cost', 'category']) if (e[k]) out[k] = e[k];
   return out;
 }
@@ -1372,7 +1372,7 @@ const KINDS = {
   organizer: { title: 'Event organizer', emoji: '🔥', blurb: 'Plan and lead official Phoenix Catalyst events and volunteer shifts.', grants: 'Lets you post official Phoenix events and see who signed up.' },
   moderator: { title: 'App moderator', emoji: '🛡️', blurb: 'Keep the community calendar trustworthy: review new posts, reports and comments.', grants: 'Lets you hide or remove posts and comments that break the rules.' },
 };
-const RULES = {
+const APPLY_TERMS = {
   volunteer: 'I’ll treat everyone with respect, follow event leaders’ safety instructions, and let the team know if I can’t make a shift.',
   organizer: 'I’ll only post official Phoenix events that the team has agreed to, keep sign-up details private, and follow The Phoenix Catalyst’s safety and conduct guidelines.',
   moderator: 'I’ll review posts and comments fairly, never use moderator tools for personal disputes, and keep reporters’ and members’ information private.',
@@ -1429,7 +1429,7 @@ async function viewApply(kind) {
         <label class="field"><span>How did you hear about us? <span class="muted small">(optional)</span></span><input type="text" name="heard" maxlength="200"></label>
         <label class="field"><span>Resume <span class="muted small">(optional · PDF, Word or photo, up to 10 MB)</span></span><input type="file" name="resume" accept="${RESUME_EXT}"></label>
       </div>
-      <label class="check agree"><input type="checkbox" name="agree" required> <span>${h(RULES[kind])}</span></label>
+      <label class="check agree"><input type="checkbox" name="agree" required> <span>${h(APPLY_TERMS[kind])}</span></label>
       <p class="error" id="apperr" role="alert"></p>
       <div class="row"><button class="btn" type="submit">Send application</button><a class="btn ghost" href="#/about">Cancel</a></div>
       <p class="small muted">Only Phoenix Catalyst admins can see your application.</p>
@@ -1454,7 +1454,7 @@ async function viewApply(kind) {
     const btn = f.querySelector('[type=submit]'); busy(btn, true, 'Sending…');
     let uploaded = null;
     try {
-      const answers = { name: val('name'), phone: val('phone') || null, email: state.user.email ?? null, adult: f.adult.checked, about: val('about') || null, heard: val('heard') || null, agreed: RULES[kind] };
+      const answers = { name: val('name'), phone: val('phone') || null, email: state.user.email ?? null, adult: f.adult.checked, about: val('about') || null, heard: val('heard') || null, agreed: APPLY_TERMS[kind] };
       if (kind === 'volunteer') Object.assign(answers, { interests: picked('interests'), availability: picked('availability') });
       if (kind === 'organizer') Object.assign(answers, { experience: val('experience'), events: val('events') || null });
       if (kind === 'moderator') Object.assign(answers, { experience: val('experience'), hours: val('hours') || null });
