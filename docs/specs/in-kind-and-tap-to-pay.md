@@ -14,7 +14,9 @@ shows up in the donor's gift history. Measure: share of drop-offs with a confirm
 receipt within 24 hours (target 100%); zero receipts showing a dollar value for items.
 
 ## Non-goals
-- No sales at events. That waits until the owner gets a Maryland sales-tax license (CPA).
+- No sales at events (owner decision, Nov 8).
+- Selling donated items online (eBay or similar) is planned, not in version 1. Felix and a CPA
+  check marketplace sales tax, Form 8282 and recall rules first; the platform choice comes later.
 - No vehicle, real estate, securities or crypto gifts.
 - No paper slips. No SSN or tax ID collected.
 
@@ -49,8 +51,14 @@ and price. A monthly job lists high-value items disposed of in the last 125 days
 Form 8282 filed. Items given away free for the mission are exempt from Form 8282.
 
 ## Flow: Tap to Pay
-- Phoenix Stripe account only. First version: the Stripe Dashboard app's Tap to Pay, with no
-  custom app build.
+- Phoenix Stripe account only. The owner is the Stripe admin who accepts Apple's Tap to Pay
+  terms (owner decision, Nov 8).
+- Version 1: the Stripe Dashboard app. Each Phoenix admin who takes payments is invited as a
+  limited-role team member on the Phoenix Stripe account, and the site's admin page links
+  them to it.
+- Version 2: Tap to Pay inside the Phoenix app (Stripe Terminal SDK), available to anyone with
+  the Phoenix admin role, with no separate Stripe login. A website can't use the phone's tap
+  reader, so this needs the app.
 - Before the tap, show "Donation to The Phoenix Catalyst Inc (501(c)(3), EIN 41-3050300)",
   the amount, and an email field for the receipt.
 - The webhook already handles Checkout and invoices. Add `payment_intent.succeeded` for
@@ -81,7 +89,8 @@ Form 8282 filed. Items given away free for the mission are exempt from Form 8282
 - Every receipt carries the Maryland disclosure.
 
 ## Open decisions (owner, via Ops)
-1. Who is the Phoenix Stripe admin who accepts Apple's Tap to Pay terms, and which phones.
+1. Decided: the owner is the admin and uses the Dashboard app. Still open: which admins'
+   phones take payments.
 2. Board adoption of the item acceptance policy.
 3. One CPA session: donor estimate on receipts (memo recommends leaving it off), recording
    in-kind fair value in the books and Form 990, Maryland sales tax, donated gift cards.
