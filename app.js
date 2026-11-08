@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
-import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME } from './config.js?v=25';
-import { readPoster, compressImage } from './ocr.js?v=25';
-import { FAQ, RULES } from './faq.js?v=25';
+import { SUPABASE_URL, SUPABASE_KEY, CALENDAR_FN, USERNAME_LOGIN_FN, HOME, CAMPAIGN } from './config.js?v=26';
+import { phase, parseProgress, progressUrlAllowed, bannerHtml } from './campaign.js?v=26';
+import { readPoster, compressImage } from './ocr.js?v=26';
+import { FAQ, RULES } from './faq.js?v=26';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
@@ -612,10 +613,29 @@ function greeting() {
   return state.username && !state.username.includes('@') ? `${part}, ${state.username}` : part;
 }
 
+/* ---------- year-end campaign banner (behind CAMPAIGN.enabled, off by default) ---------- */
+async function campaignProgress() {
+  if (!progressUrlAllowed(CAMPAIGN.progress_url)) return null;
+  try {
+    const r = await fetch(CAMPAIGN.progress_url, { headers: { accept: 'application/json' } });
+    return r.ok ? parseProgress(await r.json(), CAMPAIGN) : null;
+  } catch { return null; }
+}
+async function paintCampaign(slot) {
+  if (!slot || phase(CAMPAIGN) === 'off' || phase(CAMPAIGN) === 'before') return;
+  slot.innerHTML = bannerHtml(CAMPAIGN, await campaignProgress());
+  slot.querySelector('[data-campaign-give]')?.addEventListener('click', () => {
+    const give = $('#give');
+    if (give) { give.scrollIntoView({ behavior: 'smooth', block: 'start' }); give.querySelector('input')?.focus({ preventScroll: true }); }
+    else { state.scrollToGive = true; location.hash = '#/about'; }
+  });
+}
+
 async function viewCalendar() {
   const root = main();
   root.innerHTML = `<div class="greet"><p style="margin:0 0 6px">${h(greeting())}</p><h1>Bring color back into your world</h1><p id="sub">Finding what’s happening near you…</p></div>
-    <div id="top"></div><div id="feed"></div>`;
+    <div id="campaign"></div><div id="top"></div><div id="feed"></div>`;
+  paintCampaign($('#campaign'));
   const draw = async () => {
     const m = state.month, gridStart = addDays(m, -m.getDay()), gridEnd = addDays(gridStart, 42), now = new Date();
     let monthEvents = [], listEvents = [], week = [], spot = null, failed = null;
@@ -1547,6 +1567,7 @@ async function viewAbout() {
   main().innerHTML = `<div class="detail">
     <h1>The Phoenix Catalyst</h1>
     <p style="margin-top:12px;font-size:1.1rem">We strengthen mental, physical, emotional, and environmental well-being through community-driven events. Bringing color back into the world one community at a time.</p>
+    <div id="campaign"></div>
     ${donateHtml()}
     <div class="sechead"><h2>Volunteer opportunities</h2><a href="#/" id="seevol" class="small">See all</a></div>
     ${shifts ? `<p class="small muted">You’re signed up for ${shifts} shift${shifts === 1 ? '' : 's'}. They’re in <a href="#/mine">My events</a>.</p>` : ''}
@@ -1566,6 +1587,8 @@ async function viewAbout() {
   </div>`;
   $('#seevol').onclick = () => { Object.assign(state.filters, { tpc: true, when: 'upcoming' }); state.day = null; saveFilters(); };
   wireDonate($('#give'));
+  paintCampaign($('#campaign'));
+  if (state.scrollToGive) { state.scrollToGive = false; $('#give')?.scrollIntoView({ block: 'start' }); $('#give input')?.focus({ preventScroll: true }); }
   const [{ data: ev }, apps, pending] = await Promise.all([
     sb.from('phoenix_events').select('*').eq('is_tpc', true).eq('status', 'published').gte('starts_at', new Date().toISOString()).order('starts_at').limit(10),
     myApplications(),
