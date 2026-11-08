@@ -92,5 +92,9 @@ Form 8282 filed. Items given away free for the mission are exempt from Form 8282
 1. Decided: the owner is the admin and uses the Dashboard app. Still open: which admins'
    phones take payments.
 2. Board adoption of the item acceptance policy.
-3. One CPA session: donor estimate on receipts (memo recommends leaving it off), recording
-   in-kind fair value in the books and Form 990, Maryland sales tax, donated gift cards.
+3. CPA session deferred to the first yearly filing (owner decision, Nov 8). Researched answers:
+   donor's estimate stays off receipts (Pub. 1771: description, not value); record donated goods
+   in the Phoenix ledger as noncash contributions at fair value (the eBay sale price is the best
+   evidence), on their own line; online sales only through a marketplace facilitator such as eBay
+   need no Maryland sales-tax license (Comptroller tax alert, Sept 25, 2019); gift cards are
+   recorded and receipted at face value, a common practice but not confirmed by an IRS source.
