@@ -14,6 +14,7 @@ shows up in the donor's gift history. Measure: share of drop-offs with a confirm
 receipt within 24 hours (target 100%); zero receipts showing a dollar value for items.
 
 ## Non-goals
+- No gift cards (owner decision, Nov 8). They're blocked at the form like other declined items.
 - No sales at events (owner decision, Nov 8).
 - Selling donated items online (eBay or similar) is planned, not in version 1. Felix and a CPA
   check marketplace sales tax, Form 8282 and recall rules first; the platform choice comes later.
@@ -69,6 +70,24 @@ Form 8282 filed. Items given away free for the mission are exempt from Form 8282
   within 60 days and we will refund it."
 - Recurring gifts in person: not in version 1.
 
+## Books (Phoenix ledger) workflow
+Owned by Will; requirements from this spec:
+- In-kind gift: a noncash contribution entry on the Phoenix ledger (own category, separate from
+  cash donations) linked to the gift record, donor email and receipt number.
+- Fair value is Phoenix's own estimate for its books (method: eBay sold listings for similar
+  items, or the actual sale price once sold). It is never shown on the donor's receipt or to
+  the donor, and is separate from the donor's private estimate.
+- Disposition per item: kept, distributed free, sold, discarded, with date. A sale on eBay or a
+  similar marketplace records the payout, marketplace fees and the sale price against the item.
+  Sales tax collected by the marketplace is not Phoenix income or liability.
+- High-value items (signed Form 8283-B): monthly report of dispositions within 3 years with no
+  Form 8282 filed (due 125 days after disposition).
+- Tap to Pay gifts record exactly like online card gifts (card-present payments via the webhook).
+- No gift cards. No Dragonfly entries, links or marketing use. Entries follow the existing
+  rules: no edits or deletes, voids with a reason, every action audited. Kept 7 years
+  (high-value: 3 + 7).
+- Year-end report: total noncash contributions and their value, for the yearly IRS filing.
+
 ## Data, retention and privacy
 - Stored in the Phoenix ledger only, never in Dragonfly tables. Not used for Dragonfly marketing.
 - Keep gift records 7 years; high-value items 3 years plus 7. Declined items: a note only.
@@ -96,5 +115,5 @@ Form 8282 filed. Items given away free for the mission are exempt from Form 8282
    donor's estimate stays off receipts (Pub. 1771: description, not value); record donated goods
    in the Phoenix ledger as noncash contributions at fair value (the eBay sale price is the best
    evidence), on their own line; online sales only through a marketplace facilitator such as eBay
-   need no Maryland sales-tax license (Comptroller tax alert, Sept 25, 2019); gift cards are
-   recorded and receipted at face value, a common practice but not confirmed by an IRS source.
+   need no Maryland sales-tax license (Comptroller tax alert, Sept 25, 2019). Gift cards are
+   not accepted.
