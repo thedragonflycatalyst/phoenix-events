@@ -77,7 +77,17 @@ Owned by Will; requirements from this spec:
 - Fair value is Phoenix's own estimate for its books (method: eBay sold listings for similar
   items, or the actual sale price once sold). It is never shown on the donor's receipt or to
   the donor, and is separate from the donor's private estimate.
-- Disposition per item: kept, distributed free, sold, discarded, with date. A sale on eBay or a
+- Inventory (owner decision, Nov 8): every confirmed item gets an inventory ID when the
+  volunteer confirms the gift (format PC-INV-YYYYMMDD-NNN), and the receipt prints that ID next
+  to each item line. One inventory record per item: ID, receipt number, donor link, date
+  received, description, quantity, condition, storage location, status.
+- Status history is append-only (no edits, each change logged with who and when):
+  in stock -> distributed free under a named Phoenix program or event / sold / discarded or
+  recycled (with reason) / declined at drop-off.
+- Sold: platform (eBay or other), listing ID, sale date, sale price, fees, payout, and the
+  Books income entry it produced.
+- Distributed: the program or event name and date (no recipient's personal data).
+- Reports: current inventory by location and age; dispositions by type for any period. A sale on eBay or a
   similar marketplace records the payout, marketplace fees and the sale price against the item.
   Sales tax collected by the marketplace is not Phoenix income or liability.
 - High-value items (signed Form 8283-B): monthly report of dispositions within 3 years with no
