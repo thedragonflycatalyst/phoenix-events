@@ -5,7 +5,7 @@ Owner: Shasta. Status: Draft, waiting on owner decisions. Legal basis: Felix's m
 which holds the exact wording quoted below.
 
 ## Problem
-Phoenix can only take donations online. Neighbors want to drop off items (coats, food, supplies)
+Phoenix can only take donations online. Neighbors want to drop off items (household goods, food, supplies)
 and give by card at events. Today an in-kind gift gets no receipt and no record.
 
 ## Goal and measure
@@ -15,6 +15,7 @@ receipt within 24 hours (target 100%); zero receipts showing a dollar value for 
 
 ## Non-goals
 - No gift cards (owner decision, Nov 8). They're blocked at the form like other declined items.
+- No clothing, shoes, coats or accessories (owner decision, Nov 8). Blocked by category and by description; blankets and linens are still accepted as household goods.
 - No sales at events (owner decision, Nov 8).
 - Selling donated items online (eBay or similar) is planned, not in version 1. Felix and a CPA
   check marketplace sales tax, Form 8282 and recall rules first; the platform choice comes later.
