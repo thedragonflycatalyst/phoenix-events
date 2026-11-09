@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Share, View } from 'react-native';
 import { Avatar } from '@/components/avatar';
+import { TextOptIn } from '@/components/text-opt-in';
 import { Button, Card, Empty, Field, Icon, Txt, useToast } from '@/components/ui';
 import {
   changeEmail, changePassword, confirmWithCode, currentSessionId, deleteAccount, exportData, listSessions, removeAvatar,
@@ -85,6 +86,8 @@ export default function Account() {
             onPress={() => run('resend', () => resendVerification(email), 'Confirmation email sent')} />
         </Card>
       )}
+
+      <TextOptIn />
 
       <Card style={{ marginTop: 14, padding: 0 }}>
         {!hasUsername && <Row icon="person" title="Choose a username" onPress={() => toggle('username')} open={open === 'username'} />}
