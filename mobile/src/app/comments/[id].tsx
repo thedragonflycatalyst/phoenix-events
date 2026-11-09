@@ -8,6 +8,7 @@ import { Avatar } from '@/components/avatar';
 import { confirmBlock, confirmSuspend } from '@/components/safety';
 import { Heart, PersonPic } from '@/components/social';
 import { Icon, Txt, useToast } from '@/components/ui';
+import { rulesAccepted } from '@/lib/rules-gate';
 import { useApp } from '@/lib/app-state';
 import { errText } from '@/lib/model';
 import { addComment, compact, deleteComment, listComments, removeComment, reportComment, setCommentLike, timeAgo, type Comment } from '@/lib/social';
@@ -44,6 +45,7 @@ export default function CommentsSheet() {
 
   const send = async () => {
     if (!user) { router.push('/sign-in'); return; }
+    if (!rulesAccepted()) { router.push('/rules?accept=1'); return; }
     const body = text.trim();
     if (!body) return;
     setSending(true);

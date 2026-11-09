@@ -80,6 +80,7 @@ export default function About() {
         )}
         <Button kind="ghost" icon="add" title="Suggest a local organization’s calendar" onPress={() => router.push('/sources')} />
         <Button kind="quiet" icon="help" title="Questions & answers" onPress={() => router.push('/faq')} />
+        <Button kind="quiet" icon="gavel" title="Community rules" onPress={() => router.push('/rules')} />
       </View>
 
       <Txt v="h2" style={{ marginTop: 26 }}>What we do</Txt>

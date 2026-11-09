@@ -14,6 +14,7 @@ import { fmtShort, fmtTime } from '@/lib/dates';
 import { sb } from '@/lib/supabase';
 import { F, R, usePalette } from '@/lib/theme';
 import { Button, Card, Chip, Field, Icon, Txt, useToast } from './ui';
+import { rulesAccepted } from '@/lib/rules-gate';
 
 export type Draft = Partial<Pick<PEvent, 'title' | 'category' | 'location_name' | 'address' | 'organizer' | 'cost' | 'url' | 'description' | 'is_tpc' | 'is_youth' | 'chaperone_ratio' | 'volunteer_slots' | 'all_day'>> & {
   tags?: string[]; start?: Date | null; end?: Date | null;
@@ -79,6 +80,7 @@ export function EventForm({ initial, existing, poster, header, note, phoneDefaul
   const withTime = (base: Date, t: Date) => { const x = new Date(base); x.setHours(t.getHours(), t.getMinutes(), 0, 0); return x; };
 
   const save = async () => {
+    if (!existing && !rulesAccepted()) { toast('Please read and agree to the community rules first', false); router.push('/rules?accept=1'); return; }
     const title = (d.title ?? '').trim();
     if (title.length < 2) return toast('Add an event name', false);
     if (!d.start) return toast('Add the date', false);
