@@ -123,6 +123,7 @@ export default function EventScreen() {
           <Card style={{ padding: 0, marginTop: 18 }}>
             <Fact icon="calendar_month" c={c} title={fmtDay(e.starts_at)} sub={whenText(e)} />
             {place ? <Fact icon="location_on" c={c} title={e.location_name || e.address || ''} sub={e.location_name && e.address ? e.address : undefined} action={{ label: 'Get directions', onPress: directions }} /> : null}
+            {e.repeat_yearly ? <Fact icon="event_repeat" c={c} title="Every year" sub="This event comes back on the same date each year" /> : null}
             <Fact icon="confirmation_number" c={c} title={COST[e.cost]} sub={e.tags.length ? `Good for ${e.tags.map((t) => TAG[t]?.toLowerCase()).join(', ')}` : undefined} />
             <Fact icon="group" c={c} last
               title={e.going_count ? `${e.going_count} neighbor${e.going_count === 1 ? '' : 's'} going` : 'Be the first to say you’re going'}
