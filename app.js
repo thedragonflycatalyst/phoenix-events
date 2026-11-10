@@ -485,7 +485,7 @@ function evRow(e) {
     <span class="date" aria-hidden="true"><small>${h(dowShort(e.starts_at))}</small><b>${new Date(e.starts_at).getDate()}</b></span>
     <span class="body"><span class="t">${h(e.title)}</span>
       <span class="meta">${h(whenText(e))}${e.location_name ? `, ${h(e.location_name)}` : ''}</span>
-      <span class="badges">${e.is_tpc ? '<span class="badge tpc">Phoenix Catalyst</span>' : ''}${e.is_youth ? '<span class="badge">Youth event</span>' : ''}<span class="badge">${h(COST[e.cost])}</span>
+      <span class="badges">${e.is_tpc ? '<span class="badge tpc">Phoenix Catalyst</span>' : ''}${e.is_youth ? '<span class="badge">Youth event</span>' : ''}${e.repeat_yearly ? '<span class="badge">Every year</span>' : ''}<span class="badge">${h(COST[e.cost])}</span>
         ${rs ? `<span class="badge me">${rs === 'volunteer' ? 'Volunteering' : 'Going'}</span>` : ''}${e.going_count ? `<span class="badge">${e.going_count} going</span>` : ''}</span></span>
     <span class="thumb">${cover(e)}</span></a>`;
 }
@@ -1020,7 +1020,8 @@ function eventForm(e = {}, note = '') {
       <div class="chips wrap">${TAGS.map(([k, l]) => `<label class="chip"><input type="checkbox" name="tags" value="${k}" ${tags.includes(k) ? 'checked' : ''} style="accent-color:var(--ink)"> ${l}</label>`).join('')}</div></fieldset>
     <label class="field"><span>Link <span class="muted small">(optional)</span></span><input type="url" name="url" maxlength="500" placeholder="https://" value="${h(e.url)}"></label>
     <label class="field"><span>Details</span><textarea name="description" maxlength="5000">${h(e.description)}</textarea></label>
-    ${canTpc() ? `<div class="panel"><label class="check"><input type="checkbox" name="is_tpc" ${e.is_tpc ? 'checked' : ''}> Official Phoenix Catalyst volunteer event</label>
+    ${canTpc() ? `<div class="panel"><label class="check"><input type="checkbox" name="repeat_yearly" ${e.repeat_yearly ? 'checked' : ''}> 🔁 Repeats every year (next year's date is added once this one starts)</label>
+      <label class="check"><input type="checkbox" name="is_tpc" ${e.is_tpc ? 'checked' : ''}> Official Phoenix Catalyst volunteer event</label>
       <label class="field"><span>Volunteer spots <span class="muted small">(blank for unlimited)</span></span><input type="number" name="slots" min="1" max="1000" value="${h(e.volunteer_slots)}"></label>
       <label class="check"><input type="checkbox" name="is_youth" ${e.is_youth ? 'checked' : ''}> 🧒 Youth event (kids and teens, supervised by approved adult chaperones)</label>
       <label class="field"><span>Chaperone ratio <span class="muted small">(required for youth events)</span></span><input type="text" name="chaperone_ratio" maxlength="80" placeholder="1 adult per 8 kids" value="${h(e.chaperone_ratio)}"></label></div>` : ''}
@@ -1080,7 +1081,7 @@ function wireEventForm(existing, extras = {}) {
       description: f.description.value.trim() || null,
     };
     if (canTpc()) {
-      row.is_tpc = !!f.is_tpc?.checked; row.volunteer_slots = f.slots?.value ? Number(f.slots.value) : null;
+      row.is_tpc = !!f.is_tpc?.checked; row.volunteer_slots = f.slots?.value ? Number(f.slots.value) : null; row.repeat_yearly = !!f.repeat_yearly?.checked;
       row.is_youth = row.is_tpc && !!f.is_youth?.checked; row.chaperone_ratio = row.is_youth ? f.chaperone_ratio.value.trim() || null : null;
       if (row.is_youth && !row.chaperone_ratio) { err.textContent = 'Add the chaperone ratio for this youth event, like 1 adult per 8 kids.'; f.chaperone_ratio.focus(); return; }
     }

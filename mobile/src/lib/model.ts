@@ -5,7 +5,7 @@ export type PEvent = {
   title: string; description: string | null; starts_at: string; ends_at: string | null; all_day: boolean; timezone: string;
   location_name: string | null; address: string | null; lat: number | null; lng: number | null;
   category: Cat; organizer: string | null; url: string | null; poster_path: string | null; source: 'manual' | 'poster' | 'import'; import_source_id?: string | null;
-  is_tpc: boolean; is_youth: boolean; chaperone_ratio: string | null; volunteer_slots: number | null; going_count: number; volunteer_count: number;
+  is_tpc: boolean; is_youth: boolean; repeat_yearly?: boolean; chaperone_ratio: string | null; volunteer_slots: number | null; going_count: number; volunteer_count: number;
   status: 'published' | 'hidden' | 'removed'; reviewed_at: string | null; cost: 'free' | 'paid' | 'donation' | 'check'; tags: string[];
   created_at: string; updated_at: string;
 };
