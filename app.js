@@ -209,6 +209,41 @@ function codeDialog({ title, body, type, email, done }) {
     });
   });
 }
+// Event texts opt-in (Twilio toll-free verification, owner Nov 13 2026): offered right after sign-up and in the account
+// dialog, with its own unticked box. Same words as the mobile app and thedragonflycatalyst.org/phoenix-catalyst/sms-consent.
+const SMS_TERMS_URL = 'https://thedragonflycatalyst.org/phoenix-catalyst/sms-terms';
+const SMS_CONSENT_TEXT = 'Text me event reminders, volunteer updates and sign-in codes from The Phoenix Catalyst at the number above. Message frequency varies. Message and data rates may apply. Reply HELP for help or STOP to cancel at any time. Agreeing is not required to volunteer or attend.';
+async function textsDialog(afterSignup) {
+  let cur = null;
+  if (state.user) { const { data } = await sb.from('phoenix_text_contacts').select('phone, sms_on').eq('user_id', state.user.id).maybeSingle(); cur = data; }
+  const on = !!cur?.sms_on;
+  openDialog(`<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><img src="icon-192.png" alt="" width="32" height="32" style="border-radius:8px"><b>The Phoenix Catalyst</b>${afterSignup ? '<span class="small muted" style="margin-left:auto;text-transform:uppercase;letter-spacing:.08em">Optional</span>' : ''}</div><h2>Event texts</h2>
+    ${on ? `<p>Reminders for events you’re going to or volunteering at go to <b>${h(cur.phone)}</b>. Reply CONFIRM, or CANT GO if plans change.</p>
+      <div class="row"><button class="btn ghost" type="button" id="txoff">Turn off event texts</button><button class="btn quiet" type="button" data-close>Close</button></div>`
+    : `<p class="muted">Get reminders for events you RSVP to or volunteer at.</p>
+    <form id="txf"><label class="field"><span>Mobile number</span><input type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="(410) 555-0134" value="${h(cur?.phone || '')}"></label>
+      <label style="display:flex;gap:10px;align-items:flex-start;margin:10px 0"><input type="checkbox" name="agree" style="width:20px;height:20px;flex:0 0 auto;margin-top:3px"><span class="small">${h(SMS_CONSENT_TEXT)}</span></label>
+      <p class="small"><a href="${SMS_TERMS_URL}" target="_blank" rel="noopener">Text message terms</a> · <a href="${SMS_TERMS_URL}#your-privacy" target="_blank" rel="noopener">Privacy policy</a></p>
+      <p class="error" id="txerr" role="alert"></p>
+      <div class="row"><button class="btn" type="submit">Turn on event texts</button><button class="btn quiet" type="button" data-close>${afterSignup ? 'Skip for now' : 'Not now'}</button></div></form>`}`, (d) => {
+    const off = $('#txoff', d);
+    if (off) off.onclick = async () => {
+      const { error } = await sb.rpc('phoenix_text_opt_in', { p_phone: cur.phone, p_on: false, p_version: 1 });
+      if (error) return toast(errText(error));
+      d.close(); toast('Event texts are off.');
+    };
+    const f = $('#txf', d);
+    if (f) f.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const err = $('#txerr', d);
+      if (!f.phone.value.trim()) { err.textContent = 'Enter your mobile number.'; return; }
+      if (!f.agree.checked) { err.textContent = 'Tick the box to agree first.'; return; }
+      const { error } = await sb.rpc('phoenix_text_opt_in', { p_phone: f.phone.value, p_on: true, p_version: 1 });
+      if (error) { err.textContent = /bad_phone/.test(error.message) ? 'Enter a US mobile number, like (410) 555-0134.' : errText(error); return; }
+      d.close(); toast('Event texts are on. We just sent a confirmation text.');
+    });
+  });
+}
 function renderAccount() {
   const el = $('#account');
   if (!state.user) { el.innerHTML = '<button class="btn small" id="signin">Sign in</button>'; $('#signin').onclick = () => authDialog(); return; }
@@ -227,6 +262,7 @@ function accountDialog() {
       ${state.avatar ? '<button class="btn small quiet" id="picdel" type="button">Remove picture</button>' : ''}
       <button class="btn small quiet" id="chemail" type="button">Change email</button>
       <button class="btn small quiet" id="chpw" type="button">Change password</button>
+      <button class="btn small quiet" id="texts" type="button">Event texts</button>
     </div>
     <form id="acctf" class="hidden"></form>
     <p class="error" id="accterr" role="alert"></p>
@@ -286,6 +322,7 @@ function accountDialog() {
         } catch (x) { fail(x); }
       };
     };
+    $('#texts', d).onclick = () => { d.close(); textsDialog(false); };
     $('#chpw', d).onclick = () => {
       form.classList.remove('hidden'); err.textContent = '';
       form.innerHTML = `<label class="field"><span>Current password</span><input type="password" name="pw" required autocomplete="current-password"></label>
@@ -373,8 +410,8 @@ function authDialog(why = '', mode = 'in') {
           const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { username }, emailRedirectTo: redirect } });
           if (error) throw error;
           if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('email_already_registered');
-          if (data.session) { d.close(); toast('Welcome!'); }
-          else codeDialog({ title: 'Confirm your email', body: `We sent a code to <b>${h(email)}</b>. Enter it to finish creating your account.`, type: 'signup', email, done: () => toast('Welcome! 🔥') });
+          if (data.session) { d.close(); toast('Welcome!'); setTimeout(() => textsDialog(true), 400); }
+          else codeDialog({ title: 'Confirm your email', body: `We sent a code to <b>${h(email)}</b>. Enter it to finish creating your account.`, type: 'signup', email, done: () => { toast('Welcome! 🔥'); setTimeout(() => textsDialog(true), 400); } });
         }
       } catch (e) { err.textContent = errText(e); } finally { busy(btn, false); }
     });
